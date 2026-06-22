@@ -1,0 +1,23 @@
+# Python environment
+.venv/
+__pycache__/
+*.pyc
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data
+data/raw/
+data/interim/
+data/processed/
+
+# Outputs
+outputs/models/
+outputs/tables/
+outputs/figures/
+
+# System files
+.DS_Store
+
+# Environment variables
+.env
