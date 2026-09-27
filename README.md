@@ -71,5 +71,20 @@ frequency/severity claim-count mismatches, orphaned policies, a long severity ta
 a fuel-type encoding artifact, and an implausible vehicle age) — none corrected yet;
 that is Phase 3.
 
-Next: Phase 3, establishing and applying documented cleaning rules, then exploratory
-analysis of frequency and severity by rating factor.
+**Phase 3 complete:** cleaning policy decided and documented (`reports/cleaning_policy.md`,
+0 policies removed), implemented in `src/auto_pricing/features.py` and
+`scripts/prepare_data.py`, and explored in `notebooks/02_data_cleaning_eda.ipynb`
+(exposure/claim-count distributions, frequency and severity by 9 rating factors,
+large-loss concentration, and pure premium). Headline findings: portfolio frequency is
+0.1006 claims/policy-year and pure premium is €167.18/policy-year (exposure-weighted;
+naive per-policy averaging overstates both by 2.3-2.6x). `BonusMalus`, `DrivAge`, and
+`VehAge` are strong but non-linear frequency predictors; no rating factor showed a
+convincing effect on severity. Frequency × mean severity overstates true pure premium
+by exactly 36.3%, a quantified consequence of `ClaimNb` counting some claims with no
+matching payment (see cleaning_policy.md rule 2b) — carried into Phase 4/7 as a
+documented limitation to address explicitly, not silently.
+
+Next: Phase 4, splitting the data into train/validation/test by policy ID (before any
+preprocessing is fit) and building the reusable feature-engineering pipeline informed
+by this phase's findings (binning for `DrivAge`/`VehAge`, credibility treatment for
+thin segments).

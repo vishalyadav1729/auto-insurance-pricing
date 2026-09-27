@@ -17,7 +17,9 @@ from auto_pricing.eda import (
     concentration_curve,
     concentration_table,
     exposure_weighted_frequency,
+    exposure_weighted_pure_premium,
     naive_mean_frequency,
+    naive_mean_pure_premium,
     plot_mean_vs_median,
     plot_segment_frequency,
     zero_claim_share,
@@ -90,6 +92,18 @@ def test_plot_segment_frequency_returns_axes_without_error():
     assert ax.get_title() == "test"
 
 
+def test_plot_segment_frequency_supports_custom_line_ylabel_for_reuse():
+    # Same chart shape is reused for pure premium, not just frequency.
+    table = pd.DataFrame(
+        {"Band": ["A", "B"], "exposure": [100.0, 50.0], "pure_premium": [150.0, 400.0]}
+    )
+    ax = plot_segment_frequency(
+        table, category_col="Band", freq_col="pure_premium", line_ylabel="Pure premium (EUR)"
+    )
+    twin_ax = ax.figure.axes[-1]
+    assert twin_ax.get_ylabel() == "Pure premium (EUR)"
+
+
 def test_concentration_table_top_claim_dominates():
     # One claim of 100, four claims of 1 each -> total 104.
     # The single largest claim (20% of the 5 claims) should hold 100/104 of value.
@@ -121,3 +135,23 @@ def test_plot_mean_vs_median_returns_axes_without_error():
     ax = plot_mean_vs_median(table, category_col="Band", title="test")
     assert ax is not None
     assert ax.get_title() == "test"
+
+
+def test_exposure_weighted_pure_premium_portfolio_level():
+    df = pd.DataFrame({"ClaimAmountSum": [1000.0, 0.0, 500.0], "Exposure": [1.0, 1.0, 0.5]})
+    # sum(cost)/sum(exposure) = 1500 / 2.5 = 600
+    assert exposure_weighted_pure_premium(df) == 600.0
+
+
+def test_exposure_weighted_and_naive_pure_premium_disagree_on_short_exposure_claim():
+    df = pd.DataFrame(
+        {
+            "ClaimAmountSum": [1000.0] + [0.0] * 9,
+            "Exposure": [0.01] + [1.0] * 9,
+        }
+    )
+    weighted = exposure_weighted_pure_premium(df)
+    naive = naive_mean_pure_premium(df)
+    assert abs(weighted - (1000 / 9.01)) < 1e-9
+    assert naive == 10000.0  # 1000/0.01 averaged in with nine zeros
+    assert naive > weighted * 50

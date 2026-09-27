@@ -82,3 +82,23 @@ def load_severity_clean(path: Path | None = None) -> pd.DataFrame:
     """
     path = path or PROCESSED_DIR / "severity_clean.parquet"
     return pd.read_parquet(path)
+
+
+def build_policy_claim_table(freq: pd.DataFrame, sev: pd.DataFrame) -> pd.DataFrame:
+    """Left-join per-policy severity aggregates onto the frequency table.
+
+    Every row of `freq` is kept; policies with no claims get
+    ClaimNbFromSev=0 and ClaimAmountSum=0.0 rather than NaN. This is the
+    policy-level view needed to compute empirical pure premium (Phase 3
+    step 6) and, later, to evaluate a fitted frequency x severity model
+    against actual claim cost (Phase 7).
+
+    Deliberately keeps ClaimNb (from freq) and ClaimNbFromSev (from sev)
+    as two separate columns rather than reconciling them here - see
+    cleaning_policy.md rule 2b for why they are allowed to disagree.
+    """
+    sev_by_policy = aggregate_severity_by_policy(sev)
+    merged = freq.merge(sev_by_policy, on="IDpol", how="left")
+    merged["ClaimNbFromSev"] = merged["ClaimNbFromSev"].fillna(0).astype(int)
+    merged["ClaimAmountSum"] = merged["ClaimAmountSum"].fillna(0.0)
+    return merged

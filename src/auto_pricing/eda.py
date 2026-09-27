@@ -58,6 +58,41 @@ def naive_mean_frequency(df: pd.DataFrame) -> float:
     return (df["ClaimNb"] / df["Exposure"]).mean()
 
 
+def exposure_weighted_pure_premium(
+    df: pd.DataFrame, amount_col: str = "ClaimAmountSum", by: str | list[str] | None = None
+) -> pd.DataFrame | float:
+    """Correct annual pure premium: sum(amount_col) / sum(Exposure).
+
+    Mirrors exposure_weighted_frequency exactly, but on claim cost instead
+    of claim count - the same reason applies: a policy's own cost/exposure
+    ratio is not a meaningful rate on its own when exposure is small, so
+    costs and exposures are summed separately, across the group, before
+    dividing. Expects `df` to be the output of
+    auto_pricing.data.build_policy_claim_table (i.e. one row per policy,
+    with amount_col already filled with 0 for policies without a claim).
+    """
+    if by is None:
+        return df[amount_col].sum() / df["Exposure"].sum()
+
+    grouped = df.groupby(by).agg(
+        n_policies=("IDpol", "size"),
+        claim_amount=(amount_col, "sum"),
+        exposure=("Exposure", "sum"),
+    )
+    grouped["pure_premium"] = grouped["claim_amount"] / grouped["exposure"]
+    return grouped.reset_index()
+
+
+def naive_mean_pure_premium(df: pd.DataFrame, amount_col: str = "ClaimAmountSum") -> float:
+    """WRONG on purpose: unweighted mean of each policy's amount_col / Exposure.
+
+    Exists only to demonstrate the same distortion naive_mean_frequency
+    shows, at the pure-premium level - never use this to report an actual
+    pure premium figure.
+    """
+    return (df[amount_col] / df["Exposure"]).mean()
+
+
 def zero_claim_share(df: pd.DataFrame) -> float:
     """Fraction of policies with ClaimNb == 0."""
     return (df["ClaimNb"] == 0).mean()
@@ -83,17 +118,20 @@ def plot_segment_frequency(
     category_col: str,
     freq_col: str = "frequency",
     exposure_col: str = "exposure",
+    line_ylabel: str = "Claim frequency (claims / policy-year)",
     ax: plt.Axes | None = None,
     title: str | None = None,
 ) -> plt.Axes:
-    """Bar chart of exposure volume with an overlaid line of claim frequency.
+    """Bar chart of exposure volume with an overlaid line of a rate metric.
 
     `table` is expected to be the output of exposure_weighted_frequency(df,
-    by=category_col) (or anything with the same column names). Exposure is
-    drawn as bars on the left axis, frequency as a line on the right axis -
-    deliberately shown together, not frequency alone, so a rate estimated
+    by=category_col) or exposure_weighted_pure_premium(df, by=category_col)
+    (or anything with the same column shape) - `freq_col`/`line_ylabel` let
+    this same chart be reused for pure premium, not just frequency. Exposure
+    is drawn as bars on the left axis, the rate as a line on the right axis
+    - deliberately shown together, not the rate alone, so a value estimated
     from very little exposure is visibly flagged as less credible rather
-    than looking just as solid as a rate backed by tens of thousands of
+    than looking just as solid as one backed by tens of thousands of
     policy-years.
     """
     if ax is None:
@@ -105,8 +143,8 @@ def plot_segment_frequency(
     ax.tick_params(axis="x", rotation=45)
 
     ax2 = ax.twinx()
-    ax2.plot(categories, table[freq_col], color="#C44E52", marker="o", label="Frequency")
-    ax2.set_ylabel("Claim frequency (claims / policy-year)")
+    ax2.plot(categories, table[freq_col], color="#C44E52", marker="o", label=line_ylabel)
+    ax2.set_ylabel(line_ylabel)
 
     if title:
         ax.set_title(title)
