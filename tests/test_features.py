@@ -7,12 +7,17 @@ small hand-built DataFrames so the expected result can be checked by eye.
 import pandas as pd
 
 from auto_pricing.features import (
+    add_age_and_bonusmalus_bands,
+    apply_common_categories,
     cap_claim_nb,
     clean_frequency,
     clean_severity,
     clean_veh_gas,
     clip_exposure,
+    encode_area_ordinal,
     exclude_orphan_claims,
+    fit_common_categories,
+    log_density,
 )
 
 
@@ -82,3 +87,42 @@ def test_clean_severity_removes_orphans_using_cleaned_freq():
     sev = pd.DataFrame({"IDpol": [1, 99], "ClaimAmount": [10.0, 20.0]})
     out = clean_severity(freq_clean, sev)
     assert list(out["IDpol"]) == [1]
+
+
+def test_add_age_and_bonusmalus_bands_assigns_expected_labels():
+    df = pd.DataFrame({"DrivAge": [18, 45], "VehAge": [0, 12], "BonusMalus": [50, 140]})
+    out = add_age_and_bonusmalus_bands(df)
+    assert out["DrivAgeBand"].astype(str).tolist() == ["18-22", "40-49"]
+    assert out["VehAgeBand"].astype(str).tolist() == ["0", "10-14"]
+    assert out["BonusMalusBand"].astype(str).tolist() == ["50 (best)", "130+"]
+
+
+def test_log_density_matches_expected_values():
+    import numpy as np
+
+    df = pd.DataFrame({"Density": [1, 100]})
+    out = log_density(df)
+    assert out["LogDensity"].iloc[0] == 0.0  # log(1) == 0
+    assert abs(out["LogDensity"].iloc[1] - np.log(100)) < 1e-9
+
+
+def test_encode_area_ordinal_maps_a_through_f():
+    df = pd.DataFrame({"Area": ["A", "C", "F"]})
+    out = encode_area_ordinal(df)
+    assert out["AreaOrdinal"].tolist() == [0, 2, 5]
+
+
+def test_fit_common_categories_excludes_low_exposure_categories():
+    train = pd.DataFrame(
+        {"Region": ["R1", "R1", "R2", "R3"], "Exposure": [500.0, 500.0, 10.0, 1000.0]}
+    )
+    # R1 total = 1000, R2 total = 10, R3 total = 1000
+    common = fit_common_categories(train, "Region", min_exposure=100.0)
+    assert common == {"R1", "R3"}
+
+
+def test_apply_common_categories_maps_rare_and_unseen_to_other():
+    common = {"R1", "R3"}
+    series = pd.Series(["R1", "R2", "R3", "R99"])  # R2 rare, R99 never seen at fit time
+    out = apply_common_categories(series, common)
+    assert out.tolist() == ["R1", "Other", "R3", "Other"]
