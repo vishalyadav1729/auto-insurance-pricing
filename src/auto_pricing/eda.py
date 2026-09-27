@@ -22,6 +22,7 @@ it should never be used to report an actual result.
 from __future__ import annotations
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 
@@ -106,6 +107,83 @@ def plot_segment_frequency(
     ax2 = ax.twinx()
     ax2.plot(categories, table[freq_col], color="#C44E52", marker="o", label="Frequency")
     ax2.set_ylabel("Claim frequency (claims / policy-year)")
+
+    if title:
+        ax.set_title(title)
+    ax.figure.tight_layout()
+    return ax
+
+
+def concentration_table(
+    amounts: pd.Series, thresholds: list[float] = (0.01, 0.05, 0.10, 0.25, 0.50)
+) -> pd.DataFrame:
+    """Share of total claim value held by the largest X% of claims.
+
+    For a right-skewed cost distribution like ClaimAmount, this answers a
+    different question than describe() does: not "what does a typical
+    claim cost" but "how much of the total bill is driven by a small
+    number of large claims." Returns one row per threshold with columns
+    [top_pct, n_claims, share_of_total_value].
+    """
+    sorted_amounts = amounts.sort_values(ascending=False).reset_index(drop=True)
+    n = len(sorted_amounts)
+    total = sorted_amounts.sum()
+
+    rows = []
+    for pct in thresholds:
+        k = max(1, int(np.ceil(n * pct)))
+        share = sorted_amounts.iloc[:k].sum() / total
+        rows.append({"top_pct": pct, "n_claims": k, "share_of_total_value": share})
+    return pd.DataFrame(rows)
+
+
+def concentration_curve(amounts: pd.Series, points: int = 100) -> pd.DataFrame:
+    """Cumulative share of total claim value vs. cumulative share of claims,
+    sorted from the largest claim down.
+
+    Downsampled to `points` rows (default 100) so the resulting plot is
+    light regardless of how many claims are in `amounts`. Returns columns
+    [pct_claims, pct_value], both running from just above 0 to 1.0.
+    """
+    sorted_amounts = amounts.sort_values(ascending=False).reset_index(drop=True)
+    n = len(sorted_amounts)
+    total = sorted_amounts.sum()
+
+    pct_claims = np.arange(1, n + 1) / n
+    pct_value = sorted_amounts.cumsum() / total
+
+    idx = np.linspace(0, n - 1, min(points, n)).astype(int)
+    return pd.DataFrame({"pct_claims": pct_claims[idx], "pct_value": pct_value[idx]})
+
+
+def plot_mean_vs_median(
+    table: pd.DataFrame,
+    category_col: str,
+    mean_col: str = "mean",
+    median_col: str = "median",
+    ax: plt.Axes | None = None,
+    title: str | None = None,
+) -> plt.Axes:
+    """Grouped bar chart comparing mean vs. median within each category.
+
+    For a heavy-tailed quantity like claim severity, a large gap between
+    the mean and median in a given segment is itself informative: it means
+    the segment's average is being pulled around by a small number of
+    large claims rather than reflecting a typical claim in that segment.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, 4))
+
+    categories = table[category_col].astype(str)
+    x = np.arange(len(categories))
+    width = 0.35
+
+    ax.bar(x - width / 2, table[mean_col], width, color="#C44E52", label="Mean")
+    ax.bar(x + width / 2, table[median_col], width, color="#4C72B0", label="Median")
+    ax.set_xticks(x)
+    ax.set_xticklabels(categories, rotation=45)
+    ax.set_ylabel("Claim amount")
+    ax.legend()
 
     if title:
         ax.set_title(title)

@@ -14,8 +14,11 @@ import pandas as pd
 
 from auto_pricing.eda import (
     bin_numeric,
+    concentration_curve,
+    concentration_table,
     exposure_weighted_frequency,
     naive_mean_frequency,
+    plot_mean_vs_median,
     plot_segment_frequency,
     zero_claim_share,
 )
@@ -83,5 +86,38 @@ def test_plot_segment_frequency_returns_axes_without_error():
         {"Area": ["A", "B", "C"], "exposure": [100.0, 50.0, 5.0], "frequency": [0.05, 0.08, 0.20]}
     )
     ax = plot_segment_frequency(table, category_col="Area", title="test")
+    assert ax is not None
+    assert ax.get_title() == "test"
+
+
+def test_concentration_table_top_claim_dominates():
+    # One claim of 100, four claims of 1 each -> total 104.
+    # The single largest claim (20% of the 5 claims) should hold 100/104 of value.
+    amounts = pd.Series([100, 1, 1, 1, 1])
+    table = concentration_table(amounts, thresholds=[0.2])
+    assert table.loc[0, "n_claims"] == 1
+    assert abs(table.loc[0, "share_of_total_value"] - 100 / 104) < 1e-9
+
+
+def test_concentration_table_all_equal_claims_is_proportional():
+    # With identical claim amounts, the top X% of claims should hold ~X% of value.
+    amounts = pd.Series([10.0] * 100)
+    table = concentration_table(amounts, thresholds=[0.10, 0.50])
+    assert abs(table.loc[0, "share_of_total_value"] - 0.10) < 1e-9
+    assert abs(table.loc[1, "share_of_total_value"] - 0.50) < 1e-9
+
+
+def test_concentration_curve_reaches_full_coverage():
+    amounts = pd.Series([10, 20, 30, 40])
+    curve = concentration_curve(amounts, points=4)
+    assert curve["pct_claims"].iloc[-1] == 1.0
+    assert curve["pct_value"].iloc[-1] == 1.0
+    # curve should be non-decreasing (cumulative share can't fall)
+    assert (curve["pct_value"].diff().dropna() >= 0).all()
+
+
+def test_plot_mean_vs_median_returns_axes_without_error():
+    table = pd.DataFrame({"Band": ["A", "B"], "mean": [5000.0, 1800.0], "median": [1200.0, 1150.0]})
+    ax = plot_mean_vs_median(table, category_col="Band", title="test")
     assert ax is not None
     assert ax.get_title() == "test"
