@@ -47,20 +47,38 @@ can teach the model about the other 99.998% of policies.
 
 ### 2b. The broader mismatch between `ClaimNb` and severity row count
 
-**Rule: `ClaimNb` (capped, per 2a) remains the frequency-model training target.
-The severity table's `ClaimAmountSum` per policy — not a recount of `ClaimNb` —
-is used as the ground truth when evaluating pure premium in Phase 7. The
-mismatch itself is not "resolved" by making one table overwrite the other.**
+Before deciding, the 9,123 mismatched policies were split by *direction* of
+disagreement, because a mismatch that goes one way consistently means
+something different from one that goes both ways randomly:
 
-Reasoning: `ClaimNb` is the field that was captured *alongside* each policy's
-exposure and rating factors — it's what the frequency model's offset and
-predictors are meant to explain. Silently replacing it with the severity
-table's row count would mean the frequency model's target changes without
-changing what data it's regressed against, which is a bigger, more invisible
-decision than a labelled cap. Conversely, when we later check "did the combined
-frequency × severity model predict the right total loss cost?", using
-`ClaimAmountSum` (actual money paid) as ground truth is safer than trusting
-`ClaimNb` again, precisely because we know the two disagree.
+| Direction | Count | Shape |
+|---|---|---|
+| `ClaimNb` ≥ 1, but the severity table has **zero** rows for that policy | 9,117 | 9,116 of these have *no* severity rows at all (not a partial undercount) |
+| Severity table has rows, but `ClaimNb` = 0 | 6 | Exactly the 6 orphan policies from Anomaly 3 |
+
+The 9,117-policy direction is a near-total, one-directional pattern, not
+noise: a claim was logged, but no money was ever recorded against it. That
+shape is consistent with a claim being **reported and counted**, then later
+**closed with zero payment** (denied, withdrawn, no covered damage) — a
+severity/payment table naturally has no row for a claim that paid nothing,
+while a claim-count field that counts *reported* claims naturally still
+includes it. The other 6 policies are a different problem in kind (an entire
+policy record missing from one table, not a payment-vs-report distinction)
+and are already handled under Anomaly 3.
+
+**Rule: `ClaimNb` (capped, per 2a) remains the frequency-model training
+target — it is the broader "a claim was reported" definition, and it's what
+the frequency model's offset and rating factors were captured alongside. The
+severity table's `ClaimAmountSum` per policy — not a recount of `ClaimNb` —
+is used as the ground truth when evaluating pure premium in Phase 7.**
+
+**Documented consequence, not swept under the rug:** because `ClaimNb`
+includes some zero-payout claims that `ClaimAmount` by definition cannot,
+the multiplicative identity `Pure Premium = frequency × severity` will run
+**slightly high** — it multiplies "rate of any reported claim" by "average
+cost of a *paid* claim." This is a known nuance of frequency-severity
+decomposition, not a bug, and will be stated explicitly as a limitation in
+Phase 7 rather than corrected by force-matching the two tables.
 
 This is the plan's "don't assume one source is simply right" principle applied
 literally: neither table is treated as authoritative for everything; each is
