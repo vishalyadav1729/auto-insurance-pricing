@@ -11,13 +11,26 @@ data/raw/
 data/interim/
 data/processed/
 
-# Outputs
-outputs/models/
+# Outputs (regenerable by scripts/notebooks; curate final figures into reports/ if needed for the README)
 outputs/tables/
 outputs/figures/
+outputs/metrics/
+
+# Trained model artifacts (large binaries; regenerate via scripts/train_models.py)
+artifacts/models/
+artifacts/preprocessors/
 
 # System files
 .DS_Store
 
 # Environment variables
 .env
+
+# Packaging (from `pip install -e .`)
+*.egg-info/
+build/
+dist/
+
+# Test / lint caches
+.pytest_cache/
+.ruff_cache/
