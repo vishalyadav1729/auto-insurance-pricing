@@ -62,4 +62,14 @@ pytest                        # sanity check: package imports correctly
 ## Status
 
 **Phase 1 complete:** reproducible environment, package skeleton, and import test.
-Next: Phase 2, downloading and validating the freMTPL2 frequency/severity data.
+
+**Phase 2 complete:** freMTPL2 frequency (678,013 policies) and severity (26,639 claims)
+tables downloaded via `scripts/download_data.py`, profiled and reconciled in
+`notebooks/01_data_understanding.ipynb`, with findings documented in
+`reports/data_dictionary.md`. Six anomalies were identified (out-of-range exposure,
+frequency/severity claim-count mismatches, orphaned policies, a long severity tail,
+a fuel-type encoding artifact, and an implausible vehicle age) — none corrected yet;
+that is Phase 3.
+
+Next: Phase 3, establishing and applying documented cleaning rules, then exploratory
+analysis of frequency and severity by rating factor.
