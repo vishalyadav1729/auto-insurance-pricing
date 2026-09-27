@@ -160,6 +160,13 @@ def encode_area_ordinal(freq: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def encode_vehgas_binary(freq: pd.DataFrame) -> pd.DataFrame:
+    """Encode VehGas as 0 (Diesel) / 1 (Regular). Fixed mapping, no fit needed."""
+    out = freq.copy()
+    out["VehGasBinary"] = (out["VehGas"] == "Regular").astype(int)
+    return out
+
+
 def fit_common_categories(
     train_df: pd.DataFrame, category_col: str, min_exposure: float
 ) -> set[str]:
@@ -190,3 +197,58 @@ def apply_common_categories(
     encountered (the Phase 10 Streamlit app's concern), for free.
     """
     return series.where(series.isin(common_categories), other_label)
+
+
+# Default rare-category threshold: 2,000 training-split policy-years. Chosen
+# by inspecting the real gaps in train-only exposure (not an arbitrary round
+# number) - it falls cleanly between R74 (1,687) and R23 (2,224) for Region,
+# and even more clearly between B14 (1,601) and B13 (4,745) for VehBrand,
+# and recovers exactly the specific low-exposure segments Phase 3 already
+# flagged by name (Region R43/R42/R21/R94/R83/R74, VehBrand B14) rather than
+# an arbitrary, differently-shaped set.
+DEFAULT_MIN_EXPOSURE = 2000.0
+
+
+def build_model_table(
+    freq: pd.DataFrame, splits: pd.DataFrame, min_exposure: float = DEFAULT_MIN_EXPOSURE
+) -> tuple[pd.DataFrame, dict[str, set[str]]]:
+    """Assemble the Phase 4 modelling table: freq joined with its split
+    assignment, with every feature-engineering decision from this module
+    applied. Deliberately does NOT one-hot encode anything: Phase 5's GLMs
+    (statsmodels formulas) and Phase 8's boosting models each need
+    categorical inputs in a different final shape, so this table keeps
+    engineered categoricals as plain labelled columns (bands, grouped
+    regions/brands) and lets each modelling phase encode them however that
+    model actually requires - baking in one fixed encoding here would be
+    presumptuous and could conflict with a later modelling choice.
+
+    Rare-category grouping for Region and VehBrand is fit using ONLY the
+    rows where split == "train" (fit_common_categories), then applied via
+    apply_common_categories to every row regardless of split - this is
+    what keeps the encoding identical and leak-free across train,
+    validation, and test.
+
+    Returns (model_table, category_maps). Persist category_maps (e.g. via
+    joblib) alongside the model table so the exact same rule can be
+    replayed later on brand-new data (Phase 7 evaluation, the Streamlit app).
+    """
+    merged = freq.merge(splits, on="IDpol", how="inner")
+    if len(merged) != len(freq):
+        raise ValueError("every policy in freq must have a split assignment")
+
+    merged = add_age_and_bonusmalus_bands(merged)
+    merged = log_density(merged)
+    merged = encode_area_ordinal(merged)
+    merged = encode_vehgas_binary(merged)
+
+    train_rows = merged[merged["split"] == "train"]
+    category_maps = {
+        "Region": fit_common_categories(train_rows, "Region", min_exposure),
+        "VehBrand": fit_common_categories(train_rows, "VehBrand", min_exposure),
+    }
+    merged["RegionGrouped"] = apply_common_categories(merged["Region"], category_maps["Region"])
+    merged["VehBrandGrouped"] = apply_common_categories(
+        merged["VehBrand"], category_maps["VehBrand"]
+    )
+
+    return merged, category_maps

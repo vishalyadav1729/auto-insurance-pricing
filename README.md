@@ -84,7 +84,24 @@ by exactly 36.3%, a quantified consequence of `ClaimNb` counting some claims wit
 matching payment (see cleaning_policy.md rule 2b) — carried into Phase 4/7 as a
 documented limitation to address explicitly, not silently.
 
-Next: Phase 4, splitting the data into train/validation/test by policy ID (before any
-preprocessing is fit) and building the reusable feature-engineering pipeline informed
-by this phase's findings (binning for `DrivAge`/`VehAge`, credibility treatment for
-thin segments).
+**Phase 4 complete:** policy-level 70/15/15 train/validation/test split
+(`src/auto_pricing/split.py`, `scripts/split_data.py`), stratified by claim
+occurrence — claim rate matches to 4 decimal places across all three splits
+(5.0235%). Feature engineering (`src/auto_pricing/features.py`,
+`scripts/build_model_table.py`) applies Phase 3's findings: fixed bands for
+`DrivAge`/`VehAge`/`BonusMalus`, a log transform for `Density`, an ordinal
+encoding for `Area`, and rare-category grouping for `Region`/`VehBrand` —
+fit strictly on the training split (threshold: 2,000 training policy-years,
+chosen from a real gap in the data), grouping exactly the low-credibility
+segments Phase 3 flagged by name (`Region R21/R42/R43/R74/R83/R94`,
+`VehBrand B14`) into `"Other"`. Verified applied identically across all three
+splits. Output: `data/processed/model_table.parquet` (678,013 rows, both raw
+and engineered columns — deliberately not one-hot encoded, since Phase 5's
+GLMs and Phase 8's boosting models need categoricals in different shapes)
+and the fitted category-grouping rule persisted to
+`artifacts/preprocessors/rare_category_maps.joblib`. Full column-by-column
+spec in `reports/feature_dictionary.md`.
+
+Next: Phase 5, fitting the Poisson frequency GLM with an exposure offset,
+diagnosing overdispersion, and evaluating with exposure-weighted deviance
+and calibration by decile.

@@ -9,12 +9,14 @@ import pandas as pd
 from auto_pricing.features import (
     add_age_and_bonusmalus_bands,
     apply_common_categories,
+    build_model_table,
     cap_claim_nb,
     clean_frequency,
     clean_severity,
     clean_veh_gas,
     clip_exposure,
     encode_area_ordinal,
+    encode_vehgas_binary,
     exclude_orphan_claims,
     fit_common_categories,
     log_density,
@@ -126,3 +128,68 @@ def test_apply_common_categories_maps_rare_and_unseen_to_other():
     series = pd.Series(["R1", "R2", "R3", "R99"])  # R2 rare, R99 never seen at fit time
     out = apply_common_categories(series, common)
     assert out.tolist() == ["R1", "Other", "R3", "Other"]
+
+
+def test_encode_vehgas_binary():
+    df = pd.DataFrame({"VehGas": ["Diesel", "Regular"]})
+    out = encode_vehgas_binary(df)
+    assert out["VehGasBinary"].tolist() == [0, 1]
+
+
+def _synthetic_freq_for_model_table():
+    n = 6
+    return pd.DataFrame(
+        {
+            "IDpol": [1, 2, 3, 4, 5, 6],
+            "ClaimNb": [0] * n,
+            "Exposure": [1000.0, 1000.0, 1000.0, 100.0, 5000.0, 5000.0],
+            "Region": ["X", "X", "X", "Y", "Y", "Y"],
+            "VehBrand": ["B1"] * n,
+            "VehGas": ["Regular"] * n,
+            "Area": ["A"] * n,
+            "VehPower": [5] * n,
+            "VehAge": [5] * n,
+            "DrivAge": [40] * n,
+            "BonusMalus": [50] * n,
+            "Density": [100] * n,
+        }
+    )
+
+
+def test_build_model_table_fits_rare_categories_using_train_only():
+    freq = _synthetic_freq_for_model_table()
+    # Region X: all 3 policies in train, total exposure 3000 -> common.
+    # Region Y: only 1 policy (IDpol=4, exposure=100) is in train -> rare,
+    # even though Y's *combined* exposure across all splits is 10,100
+    # (100 + 5000 + 5000), which would look common if the fit incorrectly
+    # used validation/test rows too.
+    splits = pd.DataFrame(
+        {"IDpol": [1, 2, 3, 4, 5, 6], "split": ["train", "train", "train", "train", "validation", "test"]}
+    )
+
+    model_table, category_maps = build_model_table(freq, splits, min_exposure=2000.0)
+
+    assert category_maps["Region"] == {"X"}
+    y_rows = model_table[model_table["Region"] == "Y"]
+    assert (y_rows["RegionGrouped"] == "Other").all()
+
+
+def test_build_model_table_raises_if_split_assignment_missing():
+    freq = _synthetic_freq_for_model_table()
+    splits = pd.DataFrame({"IDpol": [1, 2, 3], "split": ["train", "train", "train"]})  # missing 4,5,6
+    try:
+        build_model_table(freq, splits)
+        assert False, "expected ValueError when a policy has no split assignment"
+    except ValueError:
+        pass
+
+
+def test_build_model_table_adds_expected_engineered_columns():
+    freq = _synthetic_freq_for_model_table()
+    splits = pd.DataFrame({"IDpol": [1, 2, 3, 4, 5, 6], "split": ["train"] * 6})
+    model_table, _ = build_model_table(freq, splits, min_exposure=2000.0)
+    for col in [
+        "DrivAgeBand", "VehAgeBand", "BonusMalusBand", "LogDensity",
+        "AreaOrdinal", "VehGasBinary", "RegionGrouped", "VehBrandGrouped",
+    ]:
+        assert col in model_table.columns
