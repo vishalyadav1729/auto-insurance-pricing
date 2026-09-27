@@ -44,7 +44,7 @@ These are genuine properties of the downloaded files, confirmed by code in `src/
 
 2. **`ClaimNb` disagrees with the actual severity row count for 9,123 policies.** Some policies report `ClaimNb=1` with zero matching severity rows, and vice versa. A few policies report severity-implausible `ClaimNb` values relative to their exposure — e.g. `IDpol=2241683` reports `ClaimNb=16` over an exposure of just 0.33 years (4 months). This exact pattern is documented in scikit-learn's own tutorial on this dataset, which caps `ClaimNb` for modelling; we will make and record the same kind of decision in Phase 3 rather than assume the raw count is correct.
 
-3. **6 policies referenced in the severity table do not exist in the frequency table at all**, yet together they account for **195 claim rows** and **€788,713.18** in total claim value:
+3. **6 policies referenced in the severity table do not exist in the frequency table at all**, yet together they account for **195 claim rows** and **€788,714.18** in total claim value:
 
    | IDpol | claims | total amount |
    |---|---|---|

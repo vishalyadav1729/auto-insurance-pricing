@@ -36,14 +36,14 @@ Two separate decisions here, because this anomaly is really two different proble
 **Rule: cap `ClaimNb` at 4 for modelling.**
 
 Evidence: the distribution is `0: 643,953 / 1: 32,178 / 2: 1,784 / 3: 82 / 4: 7`,
-then a long thin tail of `5, 6, 8, 9, 11×3, 16` — 16 policies total, each with an
+then a long thin tail of `5, 6, 8, 9, 11×3, 16` — 9 policies total, each with an
 exposure too short to plausibly explain the claim count (e.g. `IDpol=2241683`:
 16 claims in 0.33 years). This matches the same cap used in scikit-learn's own
 tutorial on this dataset, for the same reason: a handful of extreme points would
 otherwise dominate a Poisson GLM's log-likelihood out of proportion to what they
 can teach the model about the other 99.998% of policies.
 
-**Impact: 16 policies (0.0024% of the portfolio) have `ClaimNb` reduced from 5–16 down to 4. No policies removed.**
+**Impact: 9 policies (0.0013% of the portfolio) have `ClaimNb` reduced from 5–16 down to 4. No policies removed.**
 
 ### 2b. The broader mismatch between `ClaimNb` and severity row count
 
@@ -96,7 +96,7 @@ model that uses rating factors literally cannot use these claims. The judgment
 call is what to do with the fact that we're excluding real money — the answer is
 to say so plainly in the final report rather than let it disappear silently.
 
-**Impact: 195 / 26,639 claim rows excluded (0.73% of claims), representing €788,713.18 / €60,697,930.68 of total claim value (1.30%).**
+**Impact: 195 / 26,639 claim rows excluded (0.73% of claims), representing €788,714.18 / €60,697,930.68 of total claim value (1.30%).**
 
 ## 4. Long right tail in `ClaimAmount` (max ≈ 3,500× the median)
 
@@ -146,7 +146,7 @@ Phase 4, not deleted here.**
 | # | Anomaly | Rule | Rows affected | Rows removed |
 |---|---|---|---|---|
 | 1 | Exposure > 1 | Clip to 1.0 | 1,224 (0.18%) | 0 |
-| 2a | Implausible ClaimNb | Cap at 4 | 16 (0.002%) | 0 |
+| 2a | Implausible ClaimNb | Cap at 4 | 9 (0.001%) | 0 |
 | 2b | ClaimNb/severity mismatch | Use ClaimNb for training, ClaimAmountSum for evaluation | 0 | 0 |
 | 3 | Orphaned claims | Exclude from modelling, disclose value | 195 claim rows (0.73%) | 195 |
 | 4 | ClaimAmount tail | No capping now; sensitivity analysis in Phase 6 | 0 | 0 |
