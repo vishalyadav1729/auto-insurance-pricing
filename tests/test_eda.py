@@ -6,9 +6,19 @@ policy has a claim - that disagreement is the whole point of having both
 functions.
 """
 
+import matplotlib
+
+matplotlib.use("Agg")  # headless backend so tests never try to open a window
+
 import pandas as pd
 
-from auto_pricing.eda import exposure_weighted_frequency, naive_mean_frequency, zero_claim_share
+from auto_pricing.eda import (
+    bin_numeric,
+    exposure_weighted_frequency,
+    naive_mean_frequency,
+    plot_segment_frequency,
+    zero_claim_share,
+)
 
 
 def test_exposure_weighted_frequency_portfolio_level():
@@ -53,3 +63,25 @@ def test_naive_and_weighted_disagree_on_short_exposure_claim():
 def test_zero_claim_share():
     df = pd.DataFrame({"ClaimNb": [0, 0, 1, 2]})
     assert zero_claim_share(df) == 0.5
+
+
+def test_bin_numeric_assigns_left_inclusive_bands():
+    series = pd.Series([18, 22, 23, 29, 30])
+    bands = bin_numeric(series, bins=[18, 23, 30, 101], labels=["18-22", "23-29", "30+"])
+    assert bands.astype(str).tolist() == ["18-22", "18-22", "23-29", "23-29", "30+"]
+
+
+def test_bin_numeric_includes_lowest_value():
+    # include_lowest=True: the very first bin edge itself must not become NaN
+    series = pd.Series([18])
+    bands = bin_numeric(series, bins=[18, 23], labels=["18-22"])
+    assert bands.astype(str).tolist() == ["18-22"]
+
+
+def test_plot_segment_frequency_returns_axes_without_error():
+    table = pd.DataFrame(
+        {"Area": ["A", "B", "C"], "exposure": [100.0, 50.0, 5.0], "frequency": [0.05, 0.08, 0.20]}
+    )
+    ax = plot_segment_frequency(table, category_col="Area", title="test")
+    assert ax is not None
+    assert ax.get_title() == "test"

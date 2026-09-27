@@ -21,6 +21,7 @@ it should never be used to report an actual result.
 
 from __future__ import annotations
 
+import matplotlib.pyplot as plt
 import pandas as pd
 
 
@@ -59,3 +60,54 @@ def naive_mean_frequency(df: pd.DataFrame) -> float:
 def zero_claim_share(df: pd.DataFrame) -> float:
     """Fraction of policies with ClaimNb == 0."""
     return (df["ClaimNb"] == 0).mean()
+
+
+def bin_numeric(
+    series: pd.Series, bins: list[float], labels: list[str] | None = None
+) -> pd.Series:
+    """Thin, named wrapper around pd.cut (left-inclusive, right-exclusive bins).
+
+    Exists so that binning choices for rating-factor EDA (e.g. DrivAge,
+    BonusMalus bands) are made in one place and are unit-testable, rather
+    than as inline pd.cut calls scattered across a notebook. These bins are
+    for exploratory tabulation only - Phase 4 may choose different bins, or
+    splines, once the EDA here has shown which factors are roughly linear
+    and which are not.
+    """
+    return pd.cut(series, bins=bins, labels=labels, right=False, include_lowest=True)
+
+
+def plot_segment_frequency(
+    table: pd.DataFrame,
+    category_col: str,
+    freq_col: str = "frequency",
+    exposure_col: str = "exposure",
+    ax: plt.Axes | None = None,
+    title: str | None = None,
+) -> plt.Axes:
+    """Bar chart of exposure volume with an overlaid line of claim frequency.
+
+    `table` is expected to be the output of exposure_weighted_frequency(df,
+    by=category_col) (or anything with the same column names). Exposure is
+    drawn as bars on the left axis, frequency as a line on the right axis -
+    deliberately shown together, not frequency alone, so a rate estimated
+    from very little exposure is visibly flagged as less credible rather
+    than looking just as solid as a rate backed by tens of thousands of
+    policy-years.
+    """
+    if ax is None:
+        _, ax = plt.subplots(figsize=(8, 4))
+
+    categories = table[category_col].astype(str)
+    ax.bar(categories, table[exposure_col], color="#B0B0B0", label="Exposure (policy-years)")
+    ax.set_ylabel("Exposure (policy-years)")
+    ax.tick_params(axis="x", rotation=45)
+
+    ax2 = ax.twinx()
+    ax2.plot(categories, table[freq_col], color="#C44E52", marker="o", label="Frequency")
+    ax2.set_ylabel("Claim frequency (claims / policy-year)")
+
+    if title:
+        ax.set_title(title)
+    ax.figure.tight_layout()
+    return ax
