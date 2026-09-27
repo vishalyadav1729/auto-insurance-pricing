@@ -16,6 +16,7 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
+PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 
 
 def load_frequency(path: Path | None = None) -> pd.DataFrame:
@@ -59,3 +60,25 @@ def aggregate_severity_by_policy(sev: pd.DataFrame) -> pd.DataFrame:
         .agg(ClaimNbFromSev=("ClaimAmount", "size"), ClaimAmountSum=("ClaimAmount", "sum"))
         .reset_index()
     )
+
+
+def load_frequency_clean(path: Path | None = None) -> pd.DataFrame:
+    """Load the cleaned policy-level table written by scripts/prepare_data.py.
+
+    This has the cleaning_policy.md rules already applied (Exposure clipped
+    to 1.0, ClaimNb capped at 4, VehGas quote characters stripped) - use
+    this, not load_frequency(), for any exploratory analysis or modelling
+    from Phase 3 onward.
+    """
+    path = path or PROCESSED_DIR / "frequency_clean.parquet"
+    return pd.read_parquet(path)
+
+
+def load_severity_clean(path: Path | None = None) -> pd.DataFrame:
+    """Load the cleaned claim-level table written by scripts/prepare_data.py.
+
+    Orphaned claims (no matching policy) have already been excluded - see
+    cleaning_policy.md rule 3.
+    """
+    path = path or PROCESSED_DIR / "severity_clean.parquet"
+    return pd.read_parquet(path)
