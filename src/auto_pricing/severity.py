@@ -106,3 +106,65 @@ def predict_severity(results, df: pd.DataFrame) -> pd.Series:
     turns out to be needed.
     """
     return results.predict(df)
+
+
+def fit_lognormal_model(train_df: pd.DataFrame, formula: str = SEVERITY_FORMULA):
+    """Fit OLS on log(ClaimAmount), as a sensitivity check against the
+    Gamma GLM.
+
+    Returns (results, smearing_factor). The smearing factor is REQUIRED
+    to use these predictions correctly - see predict_lognormal_severity's
+    docstring for why. Splitting fit and predict into two functions (like
+    fit_gamma_glm/predict_severity) would make it too easy to call
+    results.predict() directly and get the biased answer; bundling the
+    correction factor into what this function returns keeps that mistake
+    from being the path of least resistance.
+    """
+    log_formula = formula.replace("ClaimAmount", "np.log(ClaimAmount)", 1)
+    result = smf.ols(formula=log_formula, data=train_df).fit()
+    smearing_factor = np.exp(result.resid).mean()  # Duan's smearing estimator
+    return result, smearing_factor
+
+
+def predict_lognormal_severity(results, smearing_factor: float, df: pd.DataFrame) -> pd.Series:
+    """Predict expected claim cost from a fitted lognormal model, WITH
+    Duan's smearing correction applied.
+
+    Never call `results.predict(df)` directly for this model and
+    exponentiate it - that gives the predicted MEDIAN of claim cost, not
+    its mean, because exp(E[log Y]) != E[Y] for a right-skewed variable
+    (the mean of a skewed distribution always sits above its median).
+    This is explicitly a mistake the plan warns against ("taking logs and
+    fitting OLS without addressing retransformation"), and it is not a
+    small effect here: confirmed while building this - on this project's
+    real training data, the uncorrected version predicts only 40% of the
+    true total claim cost; the smearing-corrected version predicts 99%.
+    Duan's smearing factor (the mean of exp(residual) on the training
+    data, computed once by fit_lognormal_model) is a standard,
+    distribution-free correction - it does not assume the log-residuals
+    are exactly normal, unlike the simpler analytic exp(sigma^2/2)
+    correction that does.
+    """
+    return np.exp(results.predict(df)) * smearing_factor
+
+
+def large_loss_threshold(train_df: pd.DataFrame, top_pct: float = 0.01) -> float:
+    """The claim amount at the top_pct-th percentile of TRAINING claims -
+    the threshold used to identify "large losses" for the Phase 6
+    sensitivity analysis. Computed from the training split only, the same
+    fit-on-train discipline used everywhere else in this project.
+    """
+    return train_df["ClaimAmount"].quantile(1 - top_pct)
+
+
+def exclude_large_losses(df: pd.DataFrame, threshold: float) -> pd.DataFrame:
+    """Drop claims at or above `threshold`.
+
+    Used ONLY for the sensitivity analysis in
+    notebooks/04_severity_glm.ipynb / reports/severity_large_loss_sensitivity.md
+    - never for the primary severity model. cleaning_policy.md rule 4 is
+    explicit that large claims are not capped or removed by default; this
+    function exists to test how much the model's story WOULD change if
+    they were, not to actually make that change.
+    """
+    return df[df["ClaimAmount"] < threshold].reset_index(drop=True)
