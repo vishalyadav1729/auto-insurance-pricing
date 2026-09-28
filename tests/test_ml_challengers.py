@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 
 from auto_pricing.ml_challengers import (
+    ML_FEATURE_COLUMNS,
+    compute_partial_dependence,
+    compute_permutation_importance,
     fit_frequency_boosting,
     fit_severity_boosting,
     predict_frequency_boosting,
@@ -148,3 +151,35 @@ def test_severity_boosting_recovers_the_bonusmalus_difference():
     pred_best = predict_for_band("50 (best)")
     pred_worst = predict_for_band("130+")
     assert pred_worst > pred_best * 1.5  # a real, substantial difference recovered
+
+
+def test_compute_permutation_importance_ranks_the_informative_feature_first():
+    from sklearn.metrics import make_scorer, mean_poisson_deviance
+
+    train = _synthetic_train(n=4000)
+    model = fit_frequency_boosting(train, max_iter=100)
+
+    X = train[ML_FEATURE_COLUMNS]
+    y_rate = train["ClaimNb"] / train["Exposure"]
+    scorer = make_scorer(mean_poisson_deviance, greater_is_better=False)
+
+    importance_df = compute_permutation_importance(
+        model, X, y_rate, scoring=scorer, sample_weight=train["Exposure"], n_repeats=5
+    )
+    # DrivAgeBand was the only feature with a real signal in this synthetic
+    # data (see _synthetic_train) - it should rank first, well above the
+    # uninformative constant features.
+    assert importance_df.iloc[0]["feature"] == "DrivAgeBand"
+    assert importance_df.iloc[0]["importance_mean"] > 0
+
+
+def test_compute_partial_dependence_recovers_the_ushape():
+    train = _synthetic_train(n=4000)
+    model = fit_frequency_boosting(train, max_iter=100)
+    X = train[ML_FEATURE_COLUMNS]
+
+    pd_table = compute_partial_dependence(model, X, "DrivAgeBand")
+    values = dict(zip(pd_table["DrivAgeBand"], pd_table["partial_dependence"]))
+
+    assert values["18-22"] > values["30-39"]
+    assert values["70+"] > values["30-39"]

@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.inspection import partial_dependence, permutation_importance
 
 # Same rating factors as FREQUENCY_FORMULA (frequency.py) / SEVERITY_FORMULA
 # (severity.py), as plain column names instead of a patsy formula string -
@@ -143,3 +144,67 @@ def predict_severity_boosting(model: HistGradientBoostingRegressor, df: pd.DataF
     auto_pricing.severity.predict_severity's contract exactly.
     """
     return pd.Series(model.predict(df[ML_FEATURE_COLUMNS]), index=df.index)
+
+
+def compute_permutation_importance(
+    model: HistGradientBoostingRegressor,
+    X: pd.DataFrame,
+    y: pd.Series,
+    scoring,
+    sample_weight: pd.Series | None = None,
+    n_repeats: int = 10,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Permutation importance for a fitted boosting model, returned as a
+    DataFrame sorted from most to least important.
+
+    Must be called with `X`/`y` from the VALIDATION split, not training -
+    the plan is explicit that this should be computed out-of-sample, and
+    computing it on training data would just measure which features the
+    model overfit to, not which ones actually help it predict new data.
+
+    `scoring` should be a scikit-learn scorer built with
+    `greater_is_better=False` for a loss metric (e.g.
+    `make_scorer(mean_poisson_deviance, greater_is_better=False)`) -
+    otherwise the sign of every importance value is backwards, since
+    permutation_importance always interprets a larger score as better.
+    """
+    result = permutation_importance(
+        model,
+        X,
+        y,
+        sample_weight=sample_weight,
+        scoring=scoring,
+        n_repeats=n_repeats,
+        random_state=random_state,
+        n_jobs=-1,
+    )
+    return pd.DataFrame(
+        {
+            "feature": X.columns,
+            "importance_mean": result.importances_mean,
+            "importance_std": result.importances_std,
+        }
+    ).sort_values("importance_mean", ascending=False, ignore_index=True)
+
+
+def compute_partial_dependence(
+    model: HistGradientBoostingRegressor, X: pd.DataFrame, feature: str
+) -> pd.DataFrame:
+    """Partial dependence of `model`'s prediction on a single feature,
+    holding all others at their observed distribution.
+
+    Always uses `method="brute"` - confirmed while building this that the
+    default `method="recursion"` cannot handle the raw categorical values
+    this project's engineered columns use (it requires numeric-encoded
+    categories internally and raises a clear error otherwise); "brute"
+    re-predicts directly and works correctly with the categorical dtype
+    columns fit via `categorical_features="from_dtype"`.
+
+    A plain, unweighted average across the given rows is standard for
+    partial dependence, but interpret with the same care the plan asks
+    for elsewhere: it can evaluate unrealistic combinations when
+    predictors are correlated, and it never establishes causation.
+    """
+    result = partial_dependence(model, X, features=[feature], method="brute")
+    return pd.DataFrame({feature: result["grid_values"][0], "partial_dependence": result["average"][0]})
