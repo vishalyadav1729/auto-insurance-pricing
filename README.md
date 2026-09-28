@@ -138,6 +138,26 @@ stable under the sensitivity check) — but `VehAge`, `VehPower`, `VehGas`, `Are
 `Density`, all significant for frequency, show **no relationship to severity at all**. Full
 detail in `reports/severity_model_selection.md` and `reports/severity_relativities.md`.
 
-Next: Phase 7, combining frequency and severity into pure premium, and reconciling the
-combined prediction against actual observed loss cost — including the 36.3% frequency×severity
-overstatement already quantified back in Phase 3, which still needs an explicit resolution.
+**Phase 7 complete:** pure premium (`src/auto_pricing/pure_premium.py`,
+`notebooks/05_pure_premium_evaluation.ipynb`). Resolved the 36.3% frequency×severity
+overstatement deferred since Phase 3 — not with a flat correction factor (rejected: the
+"reported claims that get paid" rate varies from 0.65–1.00 by BonusMalus and 0.61–0.89 by
+DrivAge), but with a second, purpose-built frequency model targeting paid claims directly,
+reusing Phase 5's exact formula. Reconciliation: exact for frequency alone (ratio 1.0000),
+0.9931 combined with severity. Compared against a direct Tweedie GLM (power=1.5, chosen via a
+fair fixed-evaluation-power grid search): **champion is Frequency × Severity**, winning on
+deviance (65.44 vs. 67.89), calibration, and risk-ranking (Gini 0.30 vs. 0.26) — Tweedie's
+calibration reversed sharply between train (+23%) and validation (−32%), investigated but not
+fully explained (ruled out Phase 6's Gamma-overfitting mechanism; disclosed as open rather
+than forced). A real methodology bug was caught before publishing any Gini result: ranking by
+raw expected loss instead of annualized rate gave a non-discriminating baseline a misleadingly
+negative Gini (−0.31 vs. the correct −0.02) — fixed in `evaluation.py`, locked in with a
+regression test. **First and only test-set check** of the already-chosen champion confirms
+stability (O/E 0.843 → 0.850, no reversal). Honest limitation carried forward: portfolio-level
+and ranking performance are good, but **segment-level calibration by Region is not** — even
+the largest region (24,229 policies) shows 24% over-prediction, not explained by sample size
+alone. Full detail across `reports/pure_premium_reconciliation.md`,
+`reports/pure_premium_model_comparison.md`, and `reports/pure_premium_segment_stability.md`.
+
+Next: Phase 8, machine-learning challengers (gradient boosting) compared against the GLM
+champions established in Phases 5–7, under the same train/validation/test discipline.
