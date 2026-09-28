@@ -120,5 +120,24 @@ test showing `Area`/`Density`/`Region` are jointly significant (p≈6.2×10⁻³
 individually weak due to multicollinearity — in `reports/frequency_relativities.md`; champion
 selection rationale in `reports/frequency_model_selection.md`.
 
-Next: Phase 6, claim severity modelling (Gamma GLM with a log link), building on Phase 3's
-finding that no rating factor showed a convincing univariate effect on severity.
+**Phase 6 complete:** claim-severity modelling (`src/auto_pricing/severity.py`,
+`notebooks/04_severity_glm.ipynb`). Fit a baseline, Gamma GLM, and a lognormal alternative
+(Duan smearing-corrected — naive log-scale exponentiation understated true cost by 60% on
+this data, a documented bias now guarded against in code). Large-loss sensitivity analysis
+(deferred from Phase 3) found the full Gamma model's `DrivAgeBand` severity effect was almost
+entirely an artifact of the top 1% of claims (41% of value). On validation, the full Gamma
+GLM surprisingly *underperformed* the trivial baseline (overfitting traced to `Region`/
+`VehBrand`, 26 of 48 parameters) while the same features *helped* the lognormal model —
+explained by Gamma's raw-scale sensitivity to large claims vs. lognormal's log-scale
+resistance to them. **Champion: Lognormal (smearing-corrected, full formula)** — best
+validation deviance, most resilient calibration, and (checked, not assumed) the most stable
+relativities under the large-loss sensitivity test. Interpretation, using heteroscedasticity-
+robust standard errors (checked via Jarque-Bera/Breusch-Pagan before trusting OLS's own):
+`BonusMalus` is a genuine, robust severity driver (up to 1.66× at the worst score, confirmed
+stable under the sensitivity check) — but `VehAge`, `VehPower`, `VehGas`, `Area`, and
+`Density`, all significant for frequency, show **no relationship to severity at all**. Full
+detail in `reports/severity_model_selection.md` and `reports/severity_relativities.md`.
+
+Next: Phase 7, combining frequency and severity into pure premium, and reconciling the
+combined prediction against actual observed loss cost — including the 36.3% frequency×severity
+overstatement already quantified back in Phase 3, which still needs an explicit resolution.
