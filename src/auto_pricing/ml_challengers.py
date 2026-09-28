@@ -101,3 +101,45 @@ def predict_frequency_boosting(model: HistGradientBoostingRegressor, df: pd.Data
     """
     predicted_rate = model.predict(df[ML_FEATURE_COLUMNS])
     return pd.Series(predicted_rate, index=df.index) * df["Exposure"]
+
+
+def fit_severity_boosting(
+    train_df: pd.DataFrame,
+    max_leaf_nodes: int = 31,
+    learning_rate: float = 0.1,
+    max_iter: int = 300,
+    random_state: int = 42,
+) -> HistGradientBoostingRegressor:
+    """Fit a Gamma-loss gradient boosting model for claim severity.
+
+    No sample_weight/offset here - matches auto_pricing.severity's Gamma
+    and lognormal GLMs: each claim is already one full, independent
+    observation of cost, not something that needs exposure-weighting the
+    way a policy's claim count does.
+
+    Only ever call this with the TRAINING split of the CLAIM-LEVEL
+    severity table (auto_pricing.severity.build_severity_table), not the
+    policy-level frequency table.
+    """
+    X = train_df[ML_FEATURE_COLUMNS]
+    y = train_df["ClaimAmount"]
+
+    model = HistGradientBoostingRegressor(
+        loss="gamma",
+        categorical_features="from_dtype",
+        max_leaf_nodes=max_leaf_nodes,
+        learning_rate=learning_rate,
+        max_iter=max_iter,
+        early_stopping=True,
+        validation_fraction=0.1,
+        random_state=random_state,
+    )
+    model.fit(X, y)
+    return model
+
+
+def predict_severity_boosting(model: HistGradientBoostingRegressor, df: pd.DataFrame) -> pd.Series:
+    """Predict expected claim cost for each row of `df`, matching
+    auto_pricing.severity.predict_severity's contract exactly.
+    """
+    return pd.Series(model.predict(df[ML_FEATURE_COLUMNS]), index=df.index)

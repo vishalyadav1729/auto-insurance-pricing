@@ -3,7 +3,12 @@
 import numpy as np
 import pandas as pd
 
-from auto_pricing.ml_challengers import fit_frequency_boosting, predict_frequency_boosting
+from auto_pricing.ml_challengers import (
+    fit_frequency_boosting,
+    fit_severity_boosting,
+    predict_frequency_boosting,
+    predict_severity_boosting,
+)
 
 
 def _synthetic_train(n=3000, seed=0):
@@ -93,3 +98,53 @@ def test_fit_frequency_boosting_supports_paid_frequency_target():
     model = fit_frequency_boosting(train, target_col="ClaimNbFromSev", max_iter=50)
     pred = predict_frequency_boosting(model, train)
     assert (pred >= 0).all()
+
+
+def _synthetic_severity_train(n=3000, seed=0):
+    rng = np.random.default_rng(seed)
+    bonusmalus_band = pd.Categorical(
+        rng.choice(["50 (best)", "130+"], n), categories=["50 (best)", "130+"]
+    )
+    mean_cost = np.where(bonusmalus_band == "130+", 3000.0, 1000.0)
+    claim_amount = rng.gamma(shape=2.0, scale=mean_cost / 2.0)
+
+    return pd.DataFrame(
+        {
+            "ClaimAmount": claim_amount,
+            "DrivAgeBand": pd.Categorical(["30-39"] * n, categories=["30-39"]),
+            "VehAgeBand": pd.Categorical(["1-2"] * n, categories=["1-2"]),
+            "BonusMalusBand": bonusmalus_band,
+            "AreaOrdinal": np.zeros(n),
+            "LogDensity": np.zeros(n),
+            "VehGasBinary": np.zeros(n),
+            "RegionGrouped": pd.Categorical(["R1"] * n, categories=["R1"]),
+            "VehBrandGrouped": pd.Categorical(["B1"] * n, categories=["B1"]),
+            "VehPower": np.full(n, 5.0),
+        }
+    )
+
+
+def test_fit_severity_boosting_predicts_positive_values():
+    train = _synthetic_severity_train()
+    model = fit_severity_boosting(train, max_iter=50)
+    pred = predict_severity_boosting(model, train)
+    assert (pred > 0).all()
+
+
+def test_severity_boosting_recovers_the_bonusmalus_difference():
+    # Data was generated with the "130+" band costing 3x as much on
+    # average as "50 (best)" - the model should recover roughly that
+    # difference, not just converge to some positive number.
+    train = _synthetic_severity_train(n=8000)
+    model = fit_severity_boosting(train, max_iter=200)
+
+    def predict_for_band(band: str) -> float:
+        row = train.iloc[[0]].copy()
+        row["BonusMalusBand"] = pd.Categorical(
+            [band], categories=train["BonusMalusBand"].cat.categories
+        )
+        return predict_severity_boosting(model, row).iloc[0]
+
+    pred_best = predict_for_band("50 (best)")
+    pred_worst = predict_for_band("130+")
+    assert pred_worst > pred_best * 1.5  # a real, substantial difference recovered
