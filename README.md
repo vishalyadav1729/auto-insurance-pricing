@@ -181,5 +181,24 @@ given its genuine calibration and ranking advantage. Full detail across
 `reports/ml_pure_premium_comparison.md`, `reports/ml_interpretation.md`, and
 `reports/ml_champion_challenger_recommendation.md`.
 
-Next: Phase 9, interpretation, fairness, and model governance — building the model card and
-formal governance documentation on top of the interpretability groundwork laid in Phase 8.
+**Phase 9 complete:** interpretation, fairness, and model governance
+(`reports/model_card.md`, `reports/fairness_analysis.md`, `reports/limitations.md`,
+`notebooks/07_fairness_analysis.ipynb`). Done out of the usual order at explicit
+request — the model card (step 3) was written first, then updated after fairness
+analysis (step 1) and the consolidated limitations document (step 2) produced real
+findings, rather than sequencing all three from scratch. New checks not run in any
+earlier phase: `DrivAge` segment calibration (never checked before) shows O/E ranging
+0.57–1.33, over-predicting ages 40-69 and under-predicting 70+, not explained by sample
+size — the 60-69 band has six times the exposure of the best-calibrated 18-22 band yet
+is far worse calibrated. Checked directly whether `Region`'s own known miscalibration
+(0.46–1.83, Phase 7) reduces to age composition — it doesn't (regions with nearly
+identical mean `DrivAge` show opposite O/E directions), leaving Region's problem
+separately unexplained. A hard, disclosed limitation throughout: this dataset has no
+demographic fields (race, gender, income), so no proxy-variable analysis for
+`Region`/`Density`/`Area` is possible — stated plainly rather than implied as checked.
+`reports/limitations.md` consolidates every limitation disclosed since Phase 2 (data,
+modelling, evaluation, fairness, deployment) into one reference document; the model card
+was updated twice to incorporate both follow-on steps' findings rather than left as
+originally written.
+
+Next: Phase 10, the Streamlit pricing application.

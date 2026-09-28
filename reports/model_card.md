@@ -1,13 +1,11 @@
 # Model Card — RiskRate Pure Premium Pipeline
 
-**A note on sequencing.** A model card is normally the *last* thing written in a
-governance phase, synthesizing dedicated fairness and limitations work that came before
-it. Here, Phase 9 is being done out of order (step 3 first, at explicit request), so
-this card is grounded entirely in what Phases 1–8 already established and verified —
-nothing below is new analysis. Two sections are marked **preliminary**: they state
-what's already known but will be *expanded* by the dedicated Step 1 (fairness) and
-Step 2 (consolidated limitations) work still to come. Nothing here should be treated as
-a final fairness sign-off.
+**A note on sequencing.** This card was written first (Phase 9 step 3, before steps
+1–2, at explicit request), initially grounded only in what Phases 1–8 already
+established. It has since been updated once, after Phase 9 step 1 (fairness analysis)
+produced real findings — the Fairness considerations section below reflects that
+update. The Limitations section is updated again after Phase 9 step 2's consolidated
+limitations document.
 
 ## Intended use
 
@@ -163,10 +161,15 @@ selection wasn't an artifact of validation-specific noise.
   better, in the extreme case (`Other` region: 2.54× vs. the GLM's 1.83× under-prediction,
   Phase 8 step 3).
 
-## Limitations (preliminary — full treatment in Phase 9 step 2)
+## Limitations
 
-- Segment-level (especially regional) pure-premium miscalibration is real, checked
-  against sample size, and unresolved for both model families (above).
+Full, consolidated treatment of every limitation disclosed across this project — data,
+modelling, evaluation, fairness, and deployment — is in `reports/limitations.md` (Phase 9
+step 2). Headlines:
+
+- Segment-level pure-premium miscalibration is real, checked against sample size, and
+  unresolved for both `Region` (O/E 0.46–1.83) and `DrivAge` (O/E 0.57–1.33), and for
+  both the GLM champion and the boosted challenger.
 - Severity has limited genuine predictive signal from the available rating factors
   overall — established in Phase 3, reconfirmed by every severity model built since;
   this is a hard ceiling on pure-premium accuracy that no model family in this project
@@ -185,26 +188,32 @@ selection wasn't an artifact of validation-specific noise.
   unexplained discrepancy, but not exactly zero either, and not re-checked at the
   segment level.
 - Geographic/temporal generalizability is unverified (see Dataset population).
-- **No fairness or proxy-variable audit has been performed yet** — this is an open item
-  for Phase 9 step 1, not something this card asserts has been checked and passed.
+- No demographic data exists in this dataset, so no proxy-variable analysis is possible
+  for `Region`/`Density`/`Area` — a permanent data limitation, not a completed check.
 
-## Fairness considerations (preliminary — full treatment in Phase 9 step 1)
+## Fairness considerations
 
-Stated now at the level already supportable by existing findings, to be expanded, not
-superseded, by dedicated Step 1 work:
+Full analysis and evidence in `reports/fairness_analysis.md` (Phase 9 step 1). Summary:
 
-- **`DrivAge` is an explicit age variable.** Several jurisdictions restrict or prohibit
-  age-based auto-insurance rating for adult drivers; this project used it without
-  checking any specific jurisdiction's rules, consistent with the Prohibited Use
-  section above. Its severity effect is also the least robust of the drivers used
-  (see Subgroup results), which matters doubly if it were ever considered for removal
-  on fairness grounds — the frequency effect is the stronger, more defensible one to
-  keep, the severity effect is not.
-- **`Region`/`Density`/`Area` are geographic variables** that can correlate with
-  socioeconomic and demographic composition in ways not investigated here — no proxy
-  analysis (e.g., checking Region's correlation with any demographic covariate) has
-  been run. This is exactly the kind of check Step 1 needs to do before these factors
-  could be defended as risk-based rather than as unexamined proxies.
+- **`DrivAge` segment calibration was checked for the first time in Step 1, and is
+  genuinely miscalibrated**: observed-to-expected ratio ranges from 0.57 (ages 60-69,
+  over-predicted) to 1.33 (ages 70+, under-predicted) on validation — a ~2.3× spread not
+  explained by sample size (the 60-69 band has six times the exposure of the
+  best-calibrated 18-22 band, yet is far worse calibrated). `DrivAge` is the rating
+  factor most directly analogous to a legally protected characteristic used in this
+  project, so this is a concrete, disclosed fairness-relevant finding, not a
+  hypothetical concern. Several jurisdictions additionally restrict or prohibit
+  age-based auto rating for adult drivers outright; this project did not check any
+  specific jurisdiction's rules, consistent with the Prohibited Use section above.
+- **`Region`'s known miscalibration (0.46 to 1.83, Phase 7 step 4) does not reduce to
+  age composition.** Step 1 checked directly whether regions with older or younger mean
+  `DrivAge` inherited the DrivAge miscalibration pattern above, and found no clean
+  relationship (e.g. `R41` and `R93` have nearly identical mean ages but opposite O/E
+  directions) — Region's miscalibration remains its own separate, unexplained problem.
+- **No proxy-variable analysis is possible on this dataset.** It contains no race,
+  gender, income, or occupation field, so whether `Region`/`Density`/`Area` function as
+  proxies for a protected characteristic **cannot be verified either way** — this is a
+  hard data limitation, stated plainly in Step 1 rather than assumed away.
 - **Low-exposure segments** (rare `Region`/`VehBrand` categories, the `130+`
   `BonusMalus` band at only 364 policy-years) were pooled or flagged for low
   credibility throughout the project (Phase 4–7), which limits — but does not
@@ -213,9 +222,8 @@ superseded, by dedicated Step 1 work:
 - **BonusMalus itself is not a neutral variable**: it is French regulation's own
   encoded summary of a driver's claims history, so relying on it heavily (as this
   project's champion does) largely re-prices past claims rather than introducing new
-  demographic risk factors — arguably a more defensible design than leaning on
-  demographic proxies, but this framing itself deserves scrutiny in Step 1, not an
-  assumption made here.
+  demographic risk factors — the most defensible of this project's strong rating
+  factors on fairness grounds, though this framing was not independently audited.
 
 ## Retraining and monitoring recommendations
 
@@ -223,10 +231,11 @@ superseded, by dedicated Step 1 work:
   complete absence of temporal validation here — this project cannot say how quickly
   this model's accuracy would degrade over time, because it was never tested against
   data from a later period.
-- **Recommend production monitoring of observed-to-expected ratio by region**,
-  specifically, given the documented and unresolved segment-level miscalibration —
-  aggregate portfolio-level O/E being healthy does not imply regional health (this
-  project found the opposite directly).
+- **Recommend production monitoring of observed-to-expected ratio by region and by
+  DrivAge band**, specifically, given the documented and unresolved segment-level
+  miscalibration in both (Phase 7 step 4; Phase 9 step 1) — aggregate portfolio-level
+  O/E being healthy does not imply either dimension's health (this project found the
+  opposite directly for both).
 - **Recommend re-running the large-loss sensitivity check periodically** on any
   retrained model, given how repeatedly this project found top-1%-of-claims sensitivity
   to be diagnostic (it's what first revealed the Gamma GLM's Region/VehBrand overfitting
