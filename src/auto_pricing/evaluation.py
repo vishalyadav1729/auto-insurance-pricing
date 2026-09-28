@@ -1,21 +1,19 @@
-"""Model evaluation metrics for count/rate models.
+"""Model evaluation metrics for count/rate models (Phase 5 frequency) and
+severity models (Phase 6), written generically enough to be reused for
+Phase 7's pure premium evaluation too.
 
-Built for Phase 5 (comparing frequency model candidates on the validation
-split), written generically enough to be reused for Phase 7's pure premium
-evaluation later - the same "compare exposure-weighted deviance on
-held-out data" logic applies to both.
-
-These metrics only ever take already-computed observed/predicted/exposure
-values - never a fitted model object - so they work identically regardless
-of which model produced the predictions (baseline, Poisson, regularized
-Poisson, or Negative Binomial all produce a plain predicted claim count
-per policy, and that's all these functions need).
+These metrics only ever take already-computed observed/predicted values
+(plus exposure, for the frequency-specific ones) - never a fitted model
+object - so they work identically regardless of which model produced the
+predictions. The frequency functions weight by Exposure (a policy's
+opportunity to claim varies); the severity functions do not (each claim
+is already one full, independent observation of cost).
 """
 
 from __future__ import annotations
 
 import pandas as pd
-from sklearn.metrics import mean_poisson_deviance
+from sklearn.metrics import mean_gamma_deviance, mean_poisson_deviance
 
 
 def exposure_weighted_poisson_deviance(
@@ -75,4 +73,42 @@ def calibration_by_decile(
     )
     grouped["observed_rate"] = grouped["observed_count"] / grouped["exposure"]
     grouped["predicted_rate"] = grouped["predicted_count"] / grouped["exposure"]
+    return grouped.reset_index()
+
+
+def gamma_deviance(observed: pd.Series, predicted: pd.Series) -> float:
+    """Mean Gamma deviance: the appropriate goodness-of-fit metric for a
+    continuous, positive, right-skewed outcome like claim severity - NOT
+    plain RMSE, which the plan explicitly warns against relying on here.
+    An RMSE-based comparison would be dominated almost entirely by the
+    largest few claims (confirmed in Phase 6 step 2: the top 1% of claims
+    hold 41% of total value) and would say little about how well a model
+    fits the typical claim. Thin, named wrapper around scikit-learn's
+    implementation, for a consistent call site alongside
+    exposure_weighted_poisson_deviance.
+    """
+    return mean_gamma_deviance(observed, predicted)
+
+
+def severity_calibration_by_decile(
+    observed: pd.Series, predicted: pd.Series, n_bins: int = 10
+) -> pd.DataFrame:
+    """Bin claims into deciles of PREDICTED severity, compare each
+    decile's mean observed cost against its mean predicted cost.
+
+    Unlike calibration_by_decile (frequency), there is no exposure to
+    weight by here: each claim is already one full, independent
+    observation of "cost given a claim occurred," not a partial-year
+    policy record - so deciles are formed directly from predicted
+    severity and aggregated by a simple mean, not an exposure-weighted one.
+    """
+    decile = pd.qcut(predicted, q=n_bins, labels=False, duplicates="drop")
+    df = pd.DataFrame(
+        {"decile": decile, "observed": observed.to_numpy(), "predicted": predicted.to_numpy()}
+    )
+    grouped = df.groupby("decile").agg(
+        n_claims=("observed", "size"),
+        observed_mean=("observed", "mean"),
+        predicted_mean=("predicted", "mean"),
+    )
     return grouped.reset_index()

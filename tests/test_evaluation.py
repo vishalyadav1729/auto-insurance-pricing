@@ -11,7 +11,9 @@ import pandas as pd
 from auto_pricing.evaluation import (
     calibration_by_decile,
     exposure_weighted_poisson_deviance,
+    gamma_deviance,
     observed_to_expected_ratio,
+    severity_calibration_by_decile,
 )
 
 
@@ -68,3 +70,25 @@ def test_calibration_by_decile_separates_low_and_high_risk_groups():
     assert low_bin["observed_rate"] < high_bin["observed_rate"]
     assert low_bin["n_policies"] == n
     assert high_bin["n_policies"] == n
+
+
+def test_gamma_deviance_prefers_the_closer_prediction():
+    observed = pd.Series([100.0, 500.0, 1200.0, 300.0, 2000.0])
+    good_prediction = pd.Series([110.0, 480.0, 1250.0, 290.0, 1900.0])
+    bad_prediction = pd.Series([1000.0, 50.0, 100.0, 3000.0, 200.0])
+
+    good_dev = gamma_deviance(observed, good_prediction)
+    bad_dev = gamma_deviance(observed, bad_prediction)
+    assert good_dev < bad_dev
+
+
+def test_severity_calibration_by_decile_separates_cheap_and_expensive_claims():
+    n = 50
+    observed = pd.Series([200.0] * n + [5000.0] * n)
+    predicted = pd.Series([200.0] * n + [5000.0] * n)
+
+    table = severity_calibration_by_decile(observed, predicted, n_bins=2)
+    assert len(table) == 2
+    assert table.iloc[0]["observed_mean"] < table.iloc[1]["observed_mean"]
+    assert table.iloc[0]["n_claims"] == n
+    assert table.iloc[1]["n_claims"] == n
