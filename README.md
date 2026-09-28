@@ -159,5 +159,27 @@ the largest region (24,229 policies) shows 24% over-prediction, not explained by
 alone. Full detail across `reports/pure_premium_reconciliation.md`,
 `reports/pure_premium_model_comparison.md`, and `reports/pure_premium_segment_stability.md`.
 
-Next: Phase 8, machine-learning challengers (gradient boosting) compared against the GLM
-champions established in Phases 5–7, under the same train/validation/test discipline.
+**Phase 8 complete:** machine-learning challengers (`src/auto_pricing/ml_challengers.py`,
+`notebooks/06_ml_challengers.ipynb`). Poisson/Gamma-loss gradient boosting, properly tuned
+(small deliberate grids scored on validation, never compared against the GLMs at library
+defaults), for frequency, severity, and their combination. Real, checked results throughout —
+frequency boosting won cleanly (−3.0% deviance) and *independently confirmed* the GLM's two
+strongest findings (BonusMalus, VehAge) via permutation importance and partial dependence, a
+different model family landing on the same conclusions. Severity boosting showed only a
+marginal edge (−0.38%) and, more importantly, **interpretation revealed it fails to learn the
+one severity signal (BonusMalus) independently validated as robust** — confirmed persistent
+even after re-running the exact large-loss sensitivity check Phase 6 used for the GLM. Combined
+pure premium: boosting won every aggregate metric (deviance, O/E 1.011 vs. GLM's 0.843, Gini
++8.9%) but showed *worse*, not better, segment-level calibration in the extreme case (`Other`
+region: 2.54× vs. the GLM's 1.83× under-prediction) — checked directly, not assumed to improve
+just because the aggregate numbers did. **Recommendation: champion-challenger, not a single
+winner** — the GLM pipeline remains the operational champion (comparable accuracy, decisively
+better governance and interpretability, no validated-signal loss), with the boosted pipeline
+recommended for continued development (a GLM-corrected "boosting learns the residual" approach)
+given its genuine calibration and ranking advantage. Full detail across
+`reports/ml_frequency_challenger.md`, `reports/ml_severity_challenger.md`,
+`reports/ml_pure_premium_comparison.md`, `reports/ml_interpretation.md`, and
+`reports/ml_champion_challenger_recommendation.md`.
+
+Next: Phase 9, interpretation, fairness, and model governance — building the model card and
+formal governance documentation on top of the interpretability groundwork laid in Phase 8.
