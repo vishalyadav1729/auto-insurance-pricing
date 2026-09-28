@@ -102,6 +102,23 @@ and the fitted category-grouping rule persisted to
 `artifacts/preprocessors/rare_category_maps.joblib`. Full column-by-column
 spec in `reports/feature_dictionary.md`.
 
-Next: Phase 5, fitting the Poisson frequency GLM with an exposure offset,
-diagnosing overdispersion, and evaluating with exposure-weighted deviance
-and calibration by decile.
+**Phase 5 complete:** claim-frequency modelling (`src/auto_pricing/frequency.py`,
+`src/auto_pricing/evaluation.py`, `notebooks/03_frequency_glm.ipynb`). Fit a baseline,
+Poisson GLM, a regularization sweep, and a Negative Binomial challenger (`alpha=0.8115`,
+p≈1.1×10⁻⁶⁰ — confirming material overdispersion, Pearson ratio 2.31). **Champion: Poisson
+GLM (unregularized)** — ties Negative Binomial on validation deviance (0.594235 vs 0.594267;
+NB's real benefit is calibrated standard errors, not different point predictions) and
+comfortably beats a regularization sweep that made validation deviance monotonically *worse*
+at every strength tested, despite dramatically changing specific thin-segment coefficients
+(explained: blanket regularization degrades large well-supported segments to fix small ones).
+Validation calibration: observed-to-expected ratio 0.9998; good calibration across all 10
+risk deciles (5% to 33%). Two real bugs found and fixed while building this: statsmodels'
+`.predict()` silently drops the exposure offset (confirmed across three different result
+classes), and naive persistence produced 878MB model files, fixed with a 13KB lightweight
+artifact format. Full relativity tables and interpretation — including a likelihood-ratio
+test showing `Area`/`Density`/`Region` are jointly significant (p≈6.2×10⁻³³) despite looking
+individually weak due to multicollinearity — in `reports/frequency_relativities.md`; champion
+selection rationale in `reports/frequency_model_selection.md`.
+
+Next: Phase 6, claim severity modelling (Gamma GLM with a log link), building on Phase 3's
+finding that no rating factor showed a convincing univariate effect on severity.
