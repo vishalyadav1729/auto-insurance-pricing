@@ -1,19 +1,20 @@
-"""Model evaluation metrics for count/rate models (Phase 5 frequency) and
-severity models (Phase 6), written generically enough to be reused for
-Phase 7's pure premium evaluation too.
+"""Model evaluation metrics for count/rate models (Phase 5 frequency),
+severity models (Phase 6), and pure premium (Phase 7).
 
 These metrics only ever take already-computed observed/predicted values
-(plus exposure, for the frequency-specific ones) - never a fitted model
-object - so they work identically regardless of which model produced the
-predictions. The frequency functions weight by Exposure (a policy's
-opportunity to claim varies); the severity functions do not (each claim
-is already one full, independent observation of cost).
+(plus exposure, where relevant) - never a fitted model object - so they
+work identically regardless of which model produced the predictions. The
+frequency and pure-premium functions weight by Exposure (a policy's
+opportunity to claim, or to accumulate cost, varies); the severity
+functions do not (each claim is already one full, independent observation
+of cost).
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_gamma_deviance, mean_poisson_deviance
+from sklearn.metrics import mean_gamma_deviance, mean_poisson_deviance, mean_tweedie_deviance
 
 
 def exposure_weighted_poisson_deviance(
@@ -112,3 +113,128 @@ def severity_calibration_by_decile(
         predicted_mean=("predicted", "mean"),
     )
     return grouped.reset_index()
+
+
+def tweedie_deviance(observed: pd.Series, predicted: pd.Series, power: float) -> float:
+    """Mean Tweedie deviance at a given power - the plan's primary metric
+    for comparing pure-premium candidates.
+
+    The `power` MUST be the same fixed value across every candidate being
+    compared (baseline, frequency x severity, direct Tweedie at whatever
+    power it was fit with) - the Tweedie deviance formula is a genuinely
+    different function of (observed, predicted) at different power
+    values, so "deviance at power=1.1" and "deviance at power=1.8" are not
+    on a comparable scale, even for the exact same predictions. This
+    module does not pick that shared power - see
+    auto_pricing.pure_premium.TWEEDIE_POWER for the value used
+    consistently across Phase 7's model comparison, and the reasoning
+    behind it.
+    """
+    return mean_tweedie_deviance(observed, predicted, power=power)
+
+
+def pure_premium_calibration_by_decile(
+    observed_amount: pd.Series, predicted_amount: pd.Series, exposure: pd.Series, n_bins: int = 10
+) -> pd.DataFrame:
+    """Bin ALL policies (not just claimants) into deciles of predicted
+    ANNUAL pure premium, compare each decile's exposure-weighted observed
+    rate against its predicted rate.
+
+    Unlike severity_calibration_by_decile, this covers the whole
+    portfolio (a policy with no claim contributes observed_amount=0, not
+    nothing) and weights by Exposure - the frequency-style convention,
+    because pure premium is fundamentally a rate per unit of time-at-risk,
+    the same reasoning as calibration_by_decile (frequency).
+    """
+    predicted_rate = predicted_amount / exposure
+    decile = pd.qcut(predicted_rate, q=n_bins, labels=False, duplicates="drop")
+
+    df = pd.DataFrame(
+        {
+            "decile": decile,
+            "observed_amount": observed_amount.to_numpy(),
+            "exposure": exposure.to_numpy(),
+        }
+    )
+    grouped = df.groupby("decile").agg(
+        n_policies=("exposure", "size"),
+        exposure=("exposure", "sum"),
+        observed_amount=("observed_amount", "sum"),
+    )
+    grouped["observed_rate"] = grouped["observed_amount"] / grouped["exposure"]
+
+    # predicted_rate is already a per-exposure-unit rate; its exposure-weighted
+    # mean within each decile is the fair predicted-rate summary for that bin.
+    pred_df = pd.DataFrame({"decile": decile, "predicted_rate": predicted_rate, "exposure": exposure})
+    pred_df["weighted"] = pred_df["predicted_rate"] * pred_df["exposure"]
+    pred_grouped = pred_df.groupby("decile").agg(weighted=("weighted", "sum"), exposure=("exposure", "sum"))
+    grouped["predicted_rate"] = pred_grouped["weighted"] / pred_grouped["exposure"]
+
+    return grouped.reset_index()
+
+
+def lorenz_curve(
+    observed_amount: pd.Series, predicted_rate: pd.Series, exposure: pd.Series
+) -> pd.DataFrame:
+    """Cumulative share of observed claim cost against cumulative share of
+    exposure, with policies ordered from LOWEST to HIGHEST predicted risk
+    - the standard actuarial ranking diagnostic.
+
+    Ranks by `predicted_rate` - the ANNUALIZED pure premium
+    (auto_pricing.pure_premium.predict_annual_pure_premium's output), NOT
+    raw expected loss over a policy's own exposure. This matters and was
+    checked directly, not assumed: ranking a baseline model (a flat rate
+    for every policy, so its "expected loss" is just rate x Exposure) by
+    expected loss is mechanically the same as ranking by Exposure alone -
+    and Exposure has ~0 real correlation with risk in this data (0.006).
+    Because a handful of very-short-exposure policies have one large
+    claim (the same "short policy + one big claim" pattern documented
+    repeatedly since Phase 3), ranking by expected loss let those few
+    policies dominate the low end of the curve, producing a strongly
+    NEGATIVE Gini (-0.31) for a model that has zero genuine discriminating
+    power - the opposite of the ~0 a non-discriminating model should show.
+    Ranking the same baseline by its (constant, all-tied) annualized rate
+    instead gives Gini ~ -0.02, correctly close to zero.
+
+    A model with no discriminating power at all produces a curve close to
+    the diagonal (cumulative loss share tracks cumulative exposure share);
+    a model that ranks risk well pushes the curve below the diagonal
+    (little cost from the lowest-ranked share, most of it concentrated in
+    the highest-ranked share).
+    """
+    order = np.argsort(predicted_rate.to_numpy())
+    ranked_exposure = exposure.to_numpy()[order]
+    ranked_observed = observed_amount.to_numpy()[order]
+
+    cum_exposure = np.cumsum(ranked_exposure)
+    cum_exposure = cum_exposure / cum_exposure[-1]
+    cum_observed = np.cumsum(ranked_observed)
+    cum_observed = cum_observed / cum_observed[-1]
+
+    return pd.DataFrame({"cum_exposure_share": cum_exposure, "cum_observed_share": cum_observed})
+
+
+def gini_index(observed_amount: pd.Series, predicted_rate: pd.Series, exposure: pd.Series) -> float:
+    """Normalized Gini index from the Lorenz curve above: 1 - 2 x (area
+    under the curve). 0 means predictions rank risk no better than random
+    order; close to 1 means near-perfect risk ranking (the highest-ranked
+    share of exposure accounts for almost all the observed cost).
+
+    `predicted_rate` must be an ANNUALIZED rate, not raw expected loss -
+    see lorenz_curve's docstring for why that distinction produced a
+    materially wrong (sign-flipped) Gini for a non-discriminating baseline
+    model when this was checked on real data.
+
+    IMPORTANT, stated explicitly because the plan calls this out as a
+    common mistake: this measures RANKING quality, not CALIBRATION. A
+    model whose predictions are scaled by any positive constant (e.g.
+    accidentally doubled, or divided by 2) produces the EXACT SAME Gini
+    index, because scaling every prediction by the same factor never
+    changes their relative order - while its calibration (deviance,
+    observed-to-expected ratio) would be badly wrong. Never use Gini as
+    the only metric for selecting or validating a pricing model; see
+    notebooks/05_pure_premium_evaluation.ipynb for a direct demonstration.
+    """
+    curve = lorenz_curve(observed_amount, predicted_rate, exposure)
+    area_under_curve = np.trapezoid(curve["cum_observed_share"], curve["cum_exposure_share"])
+    return 1 - 2 * area_under_curve

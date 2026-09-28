@@ -124,8 +124,16 @@ def deviance_dispersion_ratio(results) -> float:
     return results.deviance / results.df_resid
 
 
-def save_frequency_model(results, formula: str, model_type: str, path: str | Path) -> dict:
-    """Persist a small, self-contained snapshot of a fitted frequency model.
+def save_frequency_model(
+    results, formula: str, model_type: str, path: str | Path, power: float | None = None
+) -> dict:
+    """Persist a small, self-contained snapshot of a fitted frequency
+    (or, via auto_pricing.pure_premium, Tweedie pure-premium) model.
+
+    `power` is required when model_type == "tweedie" (the Tweedie
+    distribution's variance-power parameter, needed to reconstruct
+    predictions correctly - it is not stored anywhere else, since it is
+    an argument to the model family, not a fitted parameter).
 
     Deliberately does NOT pickle the statsmodels results object directly.
     Confirmed while building this: doing so produced an 878MB file for the
@@ -158,6 +166,13 @@ def save_frequency_model(results, formula: str, model_type: str, path: str | Pat
         artifact["converged"] = bool(results.converged)
     elif model_type == "negative_binomial":
         artifact["converged"] = bool(results.mle_retvals.get("converged"))
+    elif model_type == "tweedie":
+        if power is None:
+            raise ValueError("power is required when model_type == 'tweedie'")
+        artifact["deviance"] = float(results.deviance)
+        artifact["df_resid"] = float(results.df_resid)
+        artifact["converged"] = bool(results.converged)
+        artifact["power"] = float(power)
     else:
         raise ValueError(f"unknown model_type: {model_type!r}")
 
@@ -191,6 +206,9 @@ def predict_from_artifact(artifact: dict, df: pd.DataFrame) -> pd.Series:
         model = smf.glm(formula=artifact["formula"], data=df, family=sm.families.Poisson(), offset=offset)
     elif artifact["model_type"] == "negative_binomial":
         model = smf.negativebinomial(formula=artifact["formula"], data=df, offset=offset)
+    elif artifact["model_type"] == "tweedie":
+        family = sm.families.Tweedie(var_power=artifact["power"], link=sm.families.links.Log())
+        model = smf.glm(formula=artifact["formula"], data=df, family=family, offset=offset)
     else:
         raise ValueError(f"unknown model_type: {artifact['model_type']!r}")
     return model.predict(artifact["params"])

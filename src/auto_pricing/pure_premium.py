@@ -32,12 +32,30 @@ it, it adds a second, purpose-specific model for pricing.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 
 from auto_pricing.data import aggregate_severity_by_policy
 from auto_pricing.frequency import FREQUENCY_FORMULA, fit_poisson_glm
 
 PAID_FREQUENCY_FORMULA = FREQUENCY_FORMULA.replace("ClaimNb ~", "ClaimNbFromSev ~", 1)
+
+# A direct Tweedie model predicts total claim cost per policy in one step,
+# without splitting frequency and severity at all - the plan's alternative
+# approach to compare against the two-model pipeline above. Same feature
+# formula, targeting ClaimAmountSum with the same log(Exposure) offset.
+TWEEDIE_FORMULA = FREQUENCY_FORMULA.replace("ClaimNb ~", "ClaimAmountSum ~", 1)
+
+# Chosen via a fixed-evaluation-power grid search on validation data (see
+# notebooks/05_pure_premium_evaluation.ipynb, step 2): fitting powers
+# 1.1/1.3/1.5/1.7 landed within ~1.6% of each other when scored on one
+# shared reference power, with 1.3 marginally best (67.65) and 1.5 only
+# 0.36% behind (67.89) - not a meaningful difference to chase further.
+# 1.5 is the standard actuarial default for this kind of loss data and is
+# used for both fitting and evaluation here for consistency.
+TWEEDIE_POWER = 1.5
 
 
 def build_pure_premium_table(
@@ -108,3 +126,32 @@ def predict_annual_pure_premium(
         raise ValueError("exposure must share the same index as the predictions")
     annualized_frequency = paid_freq_pred / exposure
     return annualized_frequency * severity_pred
+
+
+def fit_tweedie_glm(train_df: pd.DataFrame, formula: str = TWEEDIE_FORMULA, power: float = TWEEDIE_POWER):
+    """Fit a direct Tweedie GLM predicting total claim cost (ClaimAmountSum)
+    in one step, with log(Exposure) as an offset - no frequency/severity
+    split at all.
+
+    A Tweedie distribution with 1 < power < 2 is a compound Poisson-Gamma
+    mixture: it can represent a policy with exact zero cost (no claim) and
+    a policy with a continuous positive cost (a claim happened) within one
+    single distribution, which is exactly the shape of ClaimAmountSum
+    across the whole portfolio (~95% zeros, a right-skewed positive tail
+    otherwise).
+
+    Predict with auto_pricing.frequency.predict_frequency, not
+    `results.predict(df)` directly - confirmed while building this that
+    this model class has the same offset-dropping trap already found in
+    three other statsmodels result classes (Phase 5's Poisson GLM,
+    Negative Binomial, and regularized/elastic-net results).
+
+    Only ever call this with the TRAINING split.
+    """
+    model = smf.glm(
+        formula=formula,
+        data=train_df,
+        family=sm.families.Tweedie(var_power=power, link=sm.families.links.Log()),
+        offset=np.log(train_df["Exposure"]),
+    )
+    return model.fit()

@@ -4,10 +4,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from auto_pricing.frequency import predict_frequency, predict_from_artifact, save_frequency_model
 from auto_pricing.pure_premium import (
     PAID_FREQUENCY_FORMULA,
+    TWEEDIE_FORMULA,
     build_pure_premium_table,
     fit_paid_frequency_glm,
+    fit_tweedie_glm,
     predict_annual_pure_premium,
     predict_expected_loss,
 )
@@ -110,3 +113,75 @@ def test_predict_annual_pure_premium_matches_expected_loss_at_full_exposure():
     annual = predict_annual_pure_premium(freq_pred, severity_pred, exposure)
     expected_loss = predict_expected_loss(freq_pred, severity_pred)
     assert annual.iloc[0] == pytest.approx(expected_loss.iloc[0])
+
+
+def test_tweedie_formula_targets_claimamountsum():
+    assert TWEEDIE_FORMULA.startswith("ClaimAmountSum ~")
+
+
+def _synthetic_tweedie_train(n=2000, seed=0):
+    # A genuine compound Poisson-Gamma process: some exact zeros (no
+    # claim), some continuous positive costs (a claim happened) - the
+    # exact shape a Tweedie distribution (1 < power < 2) is built for.
+    rng = np.random.default_rng(seed)
+    exposure = rng.uniform(0.2, 1.0, n)
+    group = rng.choice(["A", "B"], n)
+    claim_rate = np.where(group == "A", 0.05, 0.30)
+    mean_severity = np.where(group == "A", 1000.0, 1000.0)
+    n_claims = rng.poisson(claim_rate * exposure)
+    cost = np.array(
+        [rng.gamma(shape=2.0, scale=mean_severity[i] / 2.0 * max(k, 1)) if k > 0 else 0.0
+         for i, k in enumerate(n_claims)]
+    )
+    return pd.DataFrame({"ClaimAmountSum": cost, "Exposure": exposure, "group": group})
+
+
+def test_fit_tweedie_glm_converges_on_synthetic_data():
+    train = _synthetic_tweedie_train()
+    result = fit_tweedie_glm(train, formula="ClaimAmountSum ~ C(group)", power=1.5)
+    assert result.converged
+
+
+def test_fit_tweedie_glm_recovers_the_group_difference():
+    # Data was generated with group B claiming 6x as often as group A (same
+    # per-claim severity) - the fitted total-cost relativity should reflect
+    # that group B costs substantially more overall, not just converge.
+    train = _synthetic_tweedie_train(n=5000)
+    result = fit_tweedie_glm(train, formula="ClaimAmountSum ~ C(group)", power=1.5)
+    relativity_b_vs_a = np.exp(result.params["C(group)[T.B]"])
+    assert relativity_b_vs_a > 2.0
+
+
+def test_tweedie_predict_frequency_differs_from_naive_predict_when_offset_dropped():
+    # The same offset-dropping trap already found in three other
+    # statsmodels result classes (Phase 5's Poisson GLM, Negative
+    # Binomial, and regularized/elastic-net results) - confirmed here for
+    # a fourth: the Tweedie GLM result class too.
+    train = _synthetic_tweedie_train()
+    result = fit_tweedie_glm(train, formula="ClaimAmountSum ~ C(group)", power=1.5)
+
+    correct = predict_frequency(result, train)
+    naive_wrong = result.predict(train)
+    assert not np.allclose(correct, naive_wrong)
+
+
+def test_tweedie_model_round_trips_through_save_and_load_artifact(tmp_path):
+    train = _synthetic_tweedie_train()
+    result = fit_tweedie_glm(train, formula="ClaimAmountSum ~ C(group)", power=1.5)
+    path = tmp_path / "tweedie.joblib"
+
+    save_frequency_model(result, "ClaimAmountSum ~ C(group)", "tweedie", path, power=1.5)
+    import joblib
+
+    artifact = joblib.load(path)
+    reconstructed = predict_from_artifact(artifact, train)
+    correct = predict_frequency(result, train)
+    assert np.allclose(reconstructed, correct)
+    assert artifact["power"] == 1.5
+
+
+def test_save_frequency_model_requires_power_for_tweedie(tmp_path):
+    train = _synthetic_tweedie_train()
+    result = fit_tweedie_glm(train, formula="ClaimAmountSum ~ C(group)", power=1.5)
+    with pytest.raises(ValueError):
+        save_frequency_model(result, "ClaimAmountSum ~ C(group)", "tweedie", tmp_path / "x.joblib")
