@@ -195,8 +195,24 @@ def apply_common_categories(
     only on train uses to handle low-credibility segments is what would
     also protect a deployed model from an input category it has never
     encountered (the Phase 10 Streamlit app's concern), for free.
+
+    Returns a proper pandas Categorical with a FIXED category list
+    (sorted(common_categories) + [other_label]), not a plain string
+    column. This matters beyond style: a formula-based model (patsy's
+    C()) infers dummy columns from whatever categories are actually
+    present in the specific slice of data it's given. A plain string
+    column gives a different set of dummy columns for every different
+    slice (train vs. validation vs. a single new policy); a Categorical
+    with declared categories gives the same columns every time,
+    regardless of what's present in that particular slice - confirmed
+    while building Phase 5's persistence: predicting on a single-row
+    slice with the old plain-string version produced a 36-column design
+    matrix instead of the expected 48, purely because that one row didn't
+    contain every region/brand seen during training.
     """
-    return series.where(series.isin(common_categories), other_label)
+    mapped = series.where(series.isin(common_categories), other_label)
+    categories = sorted(common_categories) + [other_label]
+    return pd.Categorical(mapped, categories=categories)
 
 
 # Default rare-category threshold: 2,000 training-split policy-years. Chosen
