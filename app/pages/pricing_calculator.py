@@ -83,7 +83,7 @@ if calculate_clicked:
     with st.container(border=True):
         st.markdown("**Annual pure premium**")
         st.markdown(
-            f"<div style='font-size: 3rem; font-weight: 700; color: #2DD4BF; "
+            f"<div style='font-size: 3rem; font-weight: 700; color: #3B82F6; "
             f"line-height: 1.1;'>€{result['annual_pure_premium']:,.2f}</div>"
             f"<div style='opacity: 0.7; margin-top: 4px;'>per policy-year</div>",
             unsafe_allow_html=True,

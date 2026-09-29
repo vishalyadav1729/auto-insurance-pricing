@@ -26,6 +26,13 @@ def apply_custom_styling() -> None:
         h1 { font-weight: 700; letter-spacing: -0.02em; }
         h2, h3 { font-weight: 600; }
 
+        /* Use the full page width - avoid large empty margins either side */
+        .block-container {
+            max-width: 100%;
+            padding-left: 3rem;
+            padding-right: 3rem;
+        }
+
         /* Card-style bordered containers (st.container(border=True)) */
         div[data-testid="stVerticalBlockBorderWrapper"] {
             border-radius: 14px;
@@ -33,8 +40,8 @@ def apply_custom_styling() -> None:
 
         /* Metric cards */
         div[data-testid="stMetric"] {
-            background-color: #1E293B;
-            border: 1px solid #334155;
+            background-color: #131C31;
+            border: 1px solid #2A3B5C;
             border-radius: 14px;
             padding: 18px 20px;
         }
@@ -43,7 +50,7 @@ def apply_custom_styling() -> None:
             opacity: 0.85;
         }
         div[data-testid="stMetricValue"] {
-            color: #2DD4BF;
+            color: #3B82F6;
         }
 
         /* Buttons */
@@ -55,7 +62,17 @@ def apply_custom_styling() -> None:
 
         /* Sidebar nav */
         section[data-testid="stSidebar"] {
-            border-right: 1px solid #1E293B;
+            border-right: 1px solid #131C31;
+        }
+        [data-testid="stSidebarNavLink"] {
+            font-size: 1.05rem;
+            padding-top: 0.6rem;
+            padding-bottom: 0.6rem;
+        }
+
+        /* Widget labels (Policy details inputs) - a bit larger, not huge */
+        [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p {
+            font-size: 1.05rem;
         }
 
         /* Dataframes */

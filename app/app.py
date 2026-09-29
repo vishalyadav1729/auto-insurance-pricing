@@ -15,17 +15,17 @@ from __future__ import annotations
 import streamlit as st
 from styling import apply_custom_styling
 
-st.set_page_config(page_title="RiskRate — Pure Premium Pricing", page_icon="🚗")
+st.set_page_config(page_title="RiskRate — Pure Premium Pricing", layout="wide")
 apply_custom_styling()
 
 calculator_page = st.Page(
-    "pages/pricing_calculator.py", title="Pricing Calculator", icon="🚗", default=True
+    "pages/pricing_calculator.py", title="Pricing Calculator", default=True
 )
 exploration_page = st.Page(
-    "pages/model_exploration.py", title="Model Exploration", icon="📊"
+    "pages/model_exploration.py", title="Model Exploration"
 )
 governance_page = st.Page(
-    "pages/governance.py", title="Governance", icon="📋"
+    "pages/governance.py", title="Governance"
 )
 
 pg = st.navigation([calculator_page, exploration_page, governance_page])
