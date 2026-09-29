@@ -121,4 +121,8 @@ Python, pandas, statsmodels, scikit-learn, Streamlit, Jupyter, pytest, Git and G
   the actual verified numbers and reasoning behind each modelling decision.
 - `reports/` — nineteen reports covering data cleaning, frequency/severity/pure-premium
   modelling, the ML challenger comparison, and model governance.
+
+## License
+
+[MIT](LICENSE)
 - `notebooks/` — the executed analysis notebooks each report is drawn from.
