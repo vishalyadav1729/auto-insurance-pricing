@@ -22,6 +22,9 @@ calculator_page = st.Page(
 exploration_page = st.Page(
     "pages/model_exploration.py", title="Model Exploration", icon="📊"
 )
+governance_page = st.Page(
+    "pages/governance.py", title="Governance", icon="📋"
+)
 
-pg = st.navigation([calculator_page, exploration_page])
+pg = st.navigation([calculator_page, exploration_page, governance_page])
 pg.run()

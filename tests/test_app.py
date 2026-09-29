@@ -163,3 +163,45 @@ def test_model_exploration_page_relativity_selectors_are_interactive():
     at.run(timeout=30)
     at.selectbox[0].select("VehAge").run(timeout=30)
     assert not at.exception
+
+
+def test_read_report_or_error_message_returns_file_contents_when_present(tmp_path):
+    import sys
+
+    sys.path.insert(0, str(PROJECT_ROOT / "app" / "pages"))
+    from governance import read_report_or_error_message
+
+    report = tmp_path / "some_report.md"
+    report.write_text("# Real content")
+    assert read_report_or_error_message(report, tmp_path) == "# Real content"
+
+
+def test_read_report_or_error_message_returns_clear_error_when_missing(tmp_path):
+    import sys
+
+    sys.path.insert(0, str(PROJECT_ROOT / "app" / "pages"))
+    from governance import read_report_or_error_message
+
+    missing = tmp_path / "reports" / "does_not_exist.md"
+    message = read_report_or_error_message(missing, tmp_path)
+    assert "not found" in message
+    assert "does_not_exist.md" in message
+
+
+def test_app_switches_to_governance_page_and_renders_all_three_reports():
+    # The governance page reads reports/model_card.md, fairness_analysis.md,
+    # and limitations.md directly from disk (not a hand-written summary),
+    # specifically so it can never drift from the actual reports - this
+    # test would fail if a report went missing or the page stopped reading
+    # real file content.
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_file(str(PROJECT_ROOT / "app" / "app.py"))
+    at.run(timeout=30)
+    at.switch_page("pages/governance.py")
+    at.run(timeout=30)
+    assert not at.exception
+    assert len(at.tabs) == 3
+    assert len(at.markdown) == 3
+    for m in at.markdown:
+        assert len(m.value) > 500  # real report content, not an empty/error placeholder

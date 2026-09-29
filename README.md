@@ -259,5 +259,22 @@ already-computed findings presented for exploration, not recomputed. Tested with
 app tests, including a regression check that the live severity relativity stays within 0.02
 of the published value (drift detection, not just "doesn't crash").
 
-Next: Phase 10, step 3 — a governance page (surfacing the model card, fairness analysis,
-and limitations documents in-app) plus final packaging/polish.
+**Phase 10, step 3 complete, Phase 10 done:** governance page
+(`app/pages/governance.py`). Deliberately renders `reports/model_card.md`,
+`reports/fairness_analysis.md`, and `reports/limitations.md` directly from disk in three
+tabs, rather than a hand-written in-app summary — a summary would drift the next time any
+of those reports changes (as `model_card.md` itself already has, twice, in Phase 9), while
+reading the file at render time cannot drift, by construction. The missing-file fallback
+path was pulled into its own plain function (`read_report_or_error_message`) specifically
+so it could be unit-tested directly without needing Streamlit's test harness or deleting a
+real project report to exercise it. A top-of-page warning restates the "not a real pricing
+system" disclaimer. 13 app tests total (123 project-wide); a real headless server launch
+confirmed the full three-page router starts cleanly with no errors.
+
+The app now has three pages behind one router (`app/app.py` → `st.navigation`): the
+pricing calculator (step 1), the model-exploration dashboard (step 2), and this governance
+page (step 3) — none of the analytical findings live only in markdown anymore; the same
+numbers and disclosures a reader would find in `reports/` are reachable from the running
+app itself.
+
+Next: Phase 11, GitHub presentation and interview preparation.
