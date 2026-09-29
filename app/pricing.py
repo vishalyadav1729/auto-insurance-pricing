@@ -1,9 +1,11 @@
-"""Pricing logic for the RiskRate Streamlit app (Phase 10, step 1).
+"""Pricing and relativity logic for the RiskRate Streamlit app (Phase 10,
+steps 1-2: the single-policy calculator and the model-exploration
+dashboard both build on the functions here).
 
-Deliberately separate from app.py: everything here is plain functions with
-no Streamlit import, so it can be unit-tested with ordinary pytest exactly
-like every other module in this project, rather than requiring a running
-Streamlit session to verify.
+Deliberately separate from app.py and pages/*.py: everything here is plain
+functions with no Streamlit import, so it can be unit-tested with ordinary
+pytest exactly like every other module in this project, rather than
+requiring a running Streamlit session to verify.
 
 Loads the GLM champion pipeline from Phase 7 (paid-frequency Poisson GLM x
 lognormal severity GLM, the operational champion per
@@ -42,6 +44,41 @@ REGION_OPTIONS = [
 VEHBRAND_OPTIONS = ["B1", "B2", "B3", "B4", "B5", "B6", "B10", "B11", "B12", "B13", "B14"]
 AREA_OPTIONS = ["A", "B", "C", "D", "E", "F"]
 VEHGAS_OPTIONS = ["Diesel", "Regular"]
+
+# The exact reference combination reports/severity_relativities.md states
+# ("18-22 driver, brand-new vehicle, best BonusMalus, Area A, lowest
+# density, Diesel, lowest VehPower, Region R11, VehBrand B1") - using this
+# as the fixed baseline for every relativity sweep means the live numbers
+# below can be checked directly against the published relativity tables,
+# not just plausible on their own.
+REFERENCE_POLICY = {
+    "Area": "A", "VehPower": 4, "VehAge": 0, "DrivAge": 20, "BonusMalus": 50,
+    "VehBrand": "B1", "VehGas": "Diesel", "Density": 1, "Region": "R11",
+}
+
+# One representative raw value per band, chosen to fall inside that band's
+# fixed bin edges (features.py: DRIVAGE_BINS/VEHAGE_BINS/BONUSMALUS_BINS) -
+# so sweeping this factor alone (reference policy otherwise unchanged)
+# reproduces reports/frequency_relativities.md and
+# reports/severity_relativities.md's own band-by-band tables exactly.
+FACTOR_SWEEP_VALUES: dict[str, list[tuple[object, str]]] = {
+    "BonusMalus": [
+        (50, "50 (best)"), (55, "51-59"), (70, "60-79"),
+        (90, "80-99"), (110, "100-129"), (150, "130+"),
+    ],
+    "VehAge": [
+        (0, "0 (new)"), (1, "1-2"), (4, "3-5"), (7, "6-9"),
+        (12, "10-14"), (17, "15-19"), (25, "20+"),
+    ],
+    "DrivAge": [
+        (20, "18-22"), (26, "23-29"), (35, "30-39"), (45, "40-49"),
+        (55, "50-59"), (65, "60-69"), (75, "70+"),
+    ],
+    "Region": [(r, r) for r in REGION_OPTIONS],
+    "VehBrand": [(b, b) for b in VEHBRAND_OPTIONS],
+    "Area": [(a, a) for a in AREA_OPTIONS],
+    "VehGas": [(g, g) for g in VEHGAS_OPTIONS],
+}
 
 
 def load_artifacts() -> dict:
@@ -103,3 +140,54 @@ def price_policy(raw_policy: dict, artifacts: dict) -> dict:
         "severity": float(sev_pred.iloc[0]),
         "annual_pure_premium": float(annual_pure_premium.iloc[0]),
     }
+
+
+def compute_relativity_curve(
+    factor: str, artifacts: dict, target: str = "frequency", reference_policy: dict | None = None
+) -> pd.DataFrame:
+    """Sweep one rating factor across FACTOR_SWEEP_VALUES' levels, holding
+    every other factor at `reference_policy` (REFERENCE_POLICY by default),
+    and return each level's predicted value plus its relativity to the
+    first (reference) level.
+
+    This computes relativities LIVE from the deployed model artifacts, the
+    same way reports/severity_relativities.md's table was derived
+    (exp(coefficient) against a reference category) - not a copy of it.
+    With REFERENCE_POLICY as the baseline, `target="severity"` reproduces
+    that report's numbers almost exactly (e.g. BonusMalus 130+ -> 1.663x
+    here vs. 1.66x published; DrivAge 70+ -> 1.259x here vs. 1.26x
+    published) - confirmed while building this, a useful live check that
+    the persisted severity artifact hasn't drifted from what was reported.
+
+    `target="frequency"` deliberately does NOT reproduce
+    reports/frequency_relativities.md's numbers, and this is expected, not
+    a bug: this app prices using the paid-frequency model (fit on
+    ClaimNbFromSev, Phase 7 - the correct model for pricing), while
+    frequency_relativities.md documents Phase 5's reported-claims champion
+    (fit on ClaimNb) - two different fitted models by design (see
+    reports/pure_premium_reconciliation.md). Confirmed directly while
+    building this: BonusMalus 130+ comes out to ~9.0x here vs. 6.43x
+    published, and VehAge's relativities are much flatter here than
+    published - both explained by payment rate itself varying by these
+    same factors (0.65-1.00 across BonusMalus bands, Phase 7), not by any
+    error in either model.
+
+    `target` is "frequency" or "severity" - pure premium isn't offered here
+    because it mixes both models' relativities into a single number Phase
+    5/6's separately-published relativity tables were never trying to
+    represent.
+    """
+    if target not in {"frequency", "severity"}:
+        raise ValueError(f"target must be 'frequency' or 'severity', got {target!r}")
+    base_policy = reference_policy if reference_policy is not None else REFERENCE_POLICY
+
+    rows = []
+    for raw_value, label in FACTOR_SWEEP_VALUES[factor]:
+        policy = dict(base_policy, **{factor: raw_value})
+        result = price_policy(policy, artifacts)
+        value = result["annual_frequency"] if target == "frequency" else result["severity"]
+        rows.append({"level": label, "value": value})
+
+    curve = pd.DataFrame(rows)
+    curve["relativity"] = curve["value"] / curve["value"].iloc[0]
+    return curve

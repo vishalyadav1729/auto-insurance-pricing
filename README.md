@@ -236,5 +236,28 @@ never executes the Python script at all, so that approach would have missed a re
 bug. The app surfaces Phase 9's fairness findings and the model-card disclaimer
 directly in its UI, not just in the reports.
 
-Next: Phase 10, steps 2-3 — a model-exploration/relativities dashboard and a
-governance page, plus final packaging.
+**Phase 10, step 2 complete:** model-exploration dashboard (`app/pages/model_exploration.py`).
+Restructured the app into an explicit multipage router first: `app.py` now calls
+`st.navigation` over `pages/pricing_calculator.py` (step 1's calculator, moved as-is)
+and the new exploration page. This wasn't optional — confirmed directly while building
+this that the older implicit `pages/`-directory auto-detection (no `st.navigation` call)
+produces **zero** discovered pages on Streamlit 1.64, checked via `PagesManager` directly
+rather than assumed from a still-working `curl` request. The exploration page's centerpiece
+is a **live relativity explorer**: it sweeps one rating factor across its bands and computes
+frequency/severity relativities from the actual deployed artifacts, not pasted report
+tables. This surfaced a genuine, worth-disclosing finding, not a bug: the live *severity*
+relativities reproduce `reports/severity_relativities.md` almost exactly (e.g. BonusMalus
+130+ → 1.663× live vs. 1.66× published), but the live *frequency* relativities do **not**
+match `reports/frequency_relativities.md` (e.g. BonusMalus 130+ → ~9.0× live vs. 6.43×
+published) — because the app correctly prices using Phase 7's paid-frequency model
+(`ClaimNbFromSev`), a different fitted model from Phase 5's reported-claims champion
+(`ClaimNb`) that report documents, and the two diverge because payment rate itself varies
+by BonusMalus band (0.65–1.00, Phase 7). The page states this explicitly rather than
+letting a visitor assume a mismatch is an error. Also shown: the Region/DrivAge
+calibration-gap tables (Phase 7/9) and the GLM-vs-boosted scorecard (Phase 8), both
+already-computed findings presented for exploration, not recomputed. Tested with 10 total
+app tests, including a regression check that the live severity relativity stays within 0.02
+of the published value (drift detection, not just "doesn't crash").
+
+Next: Phase 10, step 3 — a governance page (surfacing the model card, fairness analysis,
+and limitations documents in-app) plus final packaging/polish.
