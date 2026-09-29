@@ -1,5 +1,7 @@
 # RiskRate: An Interpretable Personal Auto Insurance Pricing Engine
 
+**Live app: [riskrate.streamlit.app](https://riskrate.streamlit.app/)**
+
 An end-to-end actuarial pricing project built from raw claims data to a deployed pricing
 app: frequency and severity GLMs, a machine-learning challenger comparison, model
 governance and fairness analysis, and an interactive Streamlit application — all on the
@@ -44,6 +46,8 @@ phase-by-phase account, including every bug found and fixed along the way.
 
 ## The pricing app
 
+**Live: [riskrate.streamlit.app](https://riskrate.streamlit.app/)**
+
 A three-page Streamlit application sits on top of the modelling pipeline — none of this
 project's findings live only in markdown:
 
@@ -59,7 +63,7 @@ project's findings live only in markdown:
 streamlit run app/app.py
 ```
 
-*(Runs locally — see Setup below. Not yet deployed to a public URL.)*
+*(To run it locally instead, see Setup below.)*
 
 ## What this demonstrates
 
