@@ -36,31 +36,32 @@ st.caption(
     "VehPower, Region R11, VehBrand B1)."
 )
 
-target = st.radio("Relativity for:", ["severity", "frequency"], horizontal=True)
-factor = st.selectbox("Rating factor:", list(FACTOR_SWEEP_VALUES.keys()))
+with st.container(border=True):
+    target = st.radio("Relativity for:", ["severity", "frequency"], horizontal=True)
+    factor = st.selectbox("Rating factor:", list(FACTOR_SWEEP_VALUES.keys()))
 
-curve = compute_relativity_curve(factor, artifacts, target=target)
-st.bar_chart(curve.set_index("level")["relativity"])
-st.dataframe(curve, hide_index=True, width="stretch")
+    curve = compute_relativity_curve(factor, artifacts, target=target)
+    st.bar_chart(curve.set_index("level")["relativity"])
+    st.dataframe(curve, hide_index=True, width="stretch")
 
-if target == "frequency":
-    st.warning(
-        "**These frequency relativities will not match `reports/frequency_relativities.md`, "
-        "and that's expected, not a bug.** This app prices using the *paid-frequency* model "
-        "(fit on paid claims, `ClaimNbFromSev` — the correct model for pricing, Phase 7). "
-        "`frequency_relativities.md` documents Phase 5's separate *reported-claims* champion "
-        "(fit on `ClaimNb`). The two differ because the share of reported claims that get "
-        "paid itself varies by rating factor (0.65–1.00 across BonusMalus bands alone) — "
-        "confirmed directly while building this page. See `reports/pure_premium_reconciliation.md`."
-    )
-else:
-    st.success(
-        "Severity has only one model in this project (Phase 6's lognormal champion), so "
-        "this live computation reproduces `reports/severity_relativities.md`'s published "
-        "numbers almost exactly — e.g. BonusMalus 130+ comes out to ~1.66x here, matching "
-        "the report, which is a useful live check that the deployed artifact hasn't drifted "
-        "from what was reported."
-    )
+    if target == "frequency":
+        st.warning(
+            "**These frequency relativities will not match `reports/frequency_relativities.md`, "
+            "and that's expected, not a bug.** This app prices using the *paid-frequency* model "
+            "(fit on paid claims, `ClaimNbFromSev` — the correct model for pricing, Phase 7). "
+            "`frequency_relativities.md` documents Phase 5's separate *reported-claims* champion "
+            "(fit on `ClaimNb`). The two differ because the share of reported claims that get "
+            "paid itself varies by rating factor (0.65–1.00 across BonusMalus bands alone) — "
+            "confirmed directly while building this page. See `reports/pure_premium_reconciliation.md`."
+        )
+    else:
+        st.success(
+            "Severity has only one model in this project (Phase 6's lognormal champion), so "
+            "this live computation reproduces `reports/severity_relativities.md`'s published "
+            "numbers almost exactly — e.g. BonusMalus 130+ comes out to ~1.66x here, matching "
+            "the report, which is a useful live check that the deployed artifact hasn't drifted "
+            "from what was reported."
+        )
 
 st.header("2. Known segment-calibration gaps")
 st.caption(
@@ -84,15 +85,16 @@ drivage_oe = pd.DataFrame(
     }
 )
 
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader("By Region")
-    st.dataframe(region_oe, hide_index=True, width="stretch")
-    st.caption("Range 0.46–1.83, not explained by segment size — `reports/pure_premium_segment_stability.md`.")
-with c2:
-    st.subheader("By DrivAge band")
-    st.dataframe(drivage_oe, hide_index=True, width="stretch")
-    st.caption("Range 0.57–1.33; ages 40-69 over-predicted, 70+ under-predicted — `reports/fairness_analysis.md`.")
+with st.container(border=True):
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("By Region")
+        st.dataframe(region_oe, hide_index=True, width="stretch")
+        st.caption("Range 0.46–1.83, not explained by segment size — `reports/pure_premium_segment_stability.md`.")
+    with c2:
+        st.subheader("By DrivAge band")
+        st.dataframe(drivage_oe, hide_index=True, width="stretch")
+        st.caption("Range 0.57–1.33; ages 40-69 over-predicted, 70+ under-predicted — `reports/fairness_analysis.md`.")
 
 st.header("3. GLM champion vs. gradient-boosting challenger")
 st.caption("Phase 8's scorecard — champion-challenger, not a single winner. Full detail in `reports/ml_champion_challenger_recommendation.md`.")
@@ -115,11 +117,12 @@ scorecard = pd.DataFrame(
         ],
     }
 )
-st.dataframe(scorecard, hide_index=True, width="stretch")
-st.info(
-    "**Recommendation: champion-challenger, not a single winner.** The GLM pipeline is the "
-    "operational champion — comparable accuracy, no validated-signal loss, lower governance "
-    "burden. The boosted pipeline is a challenger worth continued development for its real "
-    "calibration and ranking advantage, ideally via a GLM-corrected residual-boosting "
-    "approach that would prevent it from silently dropping a validated signal."
-)
+with st.container(border=True):
+    st.dataframe(scorecard, hide_index=True, width="stretch")
+    st.info(
+        "**Recommendation: champion-challenger, not a single winner.** The GLM pipeline is the "
+        "operational champion — comparable accuracy, no validated-signal loss, lower governance "
+        "burden. The boosted pipeline is a challenger worth continued development for its real "
+        "calibration and ranking advantage, ideally via a GLM-corrected residual-boosting "
+        "approach that would prevent it from silently dropping a validated signal."
+    )

@@ -47,4 +47,5 @@ tabs = st.tabs(list(DOCUMENTS.keys()))
 for tab, filename in zip(tabs, DOCUMENTS.values()):
     with tab:
         content = read_report_or_error_message(REPORTS_DIR / filename, PROJECT_ROOT)
-        st.markdown(content)
+        with st.container(border=True):
+            st.markdown(content)

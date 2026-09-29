@@ -13,8 +13,10 @@ Run with:
 from __future__ import annotations
 
 import streamlit as st
+from styling import apply_custom_styling
 
 st.set_page_config(page_title="RiskRate — Pure Premium Pricing", page_icon="🚗")
+apply_custom_styling()
 
 calculator_page = st.Page(
     "pages/pricing_calculator.py", title="Pricing Calculator", icon="🚗", default=True

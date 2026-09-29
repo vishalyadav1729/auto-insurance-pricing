@@ -140,7 +140,10 @@ def test_app_calculate_button_produces_metrics_without_exceptions():
     at.run(timeout=30)
     at.button[0].click().run(timeout=30)
     assert not at.exception
-    assert len(at.metric) == 3
+    # Annual pure premium is a styled headline number (custom markdown), not
+    # an st.metric - only frequency and severity remain as plain metrics.
+    assert len(at.metric) == 2
+    assert any("pure premium" in m.value.lower() for m in at.markdown)
 
 
 def test_app_switches_to_model_exploration_page_without_exceptions():

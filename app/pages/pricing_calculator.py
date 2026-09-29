@@ -40,24 +40,25 @@ except FileNotFoundError as e:
 
 st.header("Policy details")
 
-col1, col2 = st.columns(2)
-with col1:
-    area = st.selectbox("Area (A = rural, F = urban)", AREA_OPTIONS, index=AREA_OPTIONS.index("D"))
-    veh_power = st.slider("Vehicle power class", min_value=4, max_value=15, value=7)
-    veh_age = st.slider("Vehicle age (years)", min_value=0, max_value=30, value=2)
-    driv_age = st.slider("Driver age (years)", min_value=18, max_value=90, value=35)
-    bonus_malus = st.slider(
-        "BonusMalus (50 = best/max discount, 100 = neutral, >100 = penalized)",
-        min_value=50, max_value=230, value=50,
-    )
-with col2:
-    veh_brand = st.selectbox("Vehicle brand code", VEHBRAND_OPTIONS)
-    veh_gas = st.selectbox("Fuel type", VEHGAS_OPTIONS)
-    density = st.number_input(
-        "Population density of policyholder's commune (inhabitants/km²)",
-        min_value=1, max_value=27000, value=1500,
-    )
-    region = st.selectbox("Region", REGION_OPTIONS, index=REGION_OPTIONS.index("R24"))
+with st.container(border=True):
+    col1, col2 = st.columns(2)
+    with col1:
+        area = st.selectbox("Area (A = rural, F = urban)", AREA_OPTIONS, index=AREA_OPTIONS.index("D"))
+        veh_power = st.slider("Vehicle power class", min_value=4, max_value=15, value=7)
+        veh_age = st.slider("Vehicle age (years)", min_value=0, max_value=30, value=2)
+        driv_age = st.slider("Driver age (years)", min_value=18, max_value=90, value=35)
+        bonus_malus = st.slider(
+            "BonusMalus (50 = best/max discount, 100 = neutral, >100 = penalized)",
+            min_value=50, max_value=230, value=50,
+        )
+    with col2:
+        veh_brand = st.selectbox("Vehicle brand code", VEHBRAND_OPTIONS)
+        veh_gas = st.selectbox("Fuel type", VEHGAS_OPTIONS)
+        density = st.number_input(
+            "Population density of policyholder's commune (inhabitants/km²)",
+            min_value=1, max_value=27000, value=1500,
+        )
+        region = st.selectbox("Region", REGION_OPTIONS, index=REGION_OPTIONS.index("R24"))
 
 raw_policy = {
     "Area": area,
@@ -71,14 +72,26 @@ raw_policy = {
     "Region": region,
 }
 
-if st.button("Calculate pure premium", type="primary"):
+st.write("")
+_, button_col, _ = st.columns([1, 1, 1])
+calculate_clicked = button_col.button("Calculate pure premium", type="primary", width="stretch")
+
+if calculate_clicked:
     result = price_policy(raw_policy, artifacts)
 
     st.header("Result")
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Predicted annual claim frequency", f"{result['annual_frequency']:.4f}")
-    m2.metric("Predicted severity (given a claim)", f"€{result['severity']:,.2f}")
-    m3.metric("Annual pure premium", f"€{result['annual_pure_premium']:,.2f}")
+    with st.container(border=True):
+        st.markdown("**Annual pure premium**")
+        st.markdown(
+            f"<div style='font-size: 3rem; font-weight: 700; color: #2DD4BF; "
+            f"line-height: 1.1;'>€{result['annual_pure_premium']:,.2f}</div>"
+            f"<div style='opacity: 0.7; margin-top: 4px;'>per policy-year</div>",
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        m1, m2 = st.columns(2)
+        m1.metric("Predicted annual claim frequency", f"{result['annual_frequency']:.4f}")
+        m2.metric("Predicted severity (given a claim)", f"€{result['severity']:,.2f}")
 
     st.caption(
         "Pure premium = annual claim frequency × severity given a claim. This is the "
