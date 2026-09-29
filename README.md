@@ -47,7 +47,7 @@ auto-insurance-pricing/
 ├── outputs/            # figures, tables, metrics (regenerable, git-ignored)
 ├── reports/            # data dictionary, modeling report, model card, limitations
 ├── tests/              # pytest tests for the package
-└── app/                # Streamlit application (added in a later phase)
+└── app/                # Streamlit application (Phase 10)
 ```
 
 ## Setup
@@ -56,7 +56,20 @@ auto-insurance-pricing/
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"      # installs the auto_pricing package + pytest/ruff
+pip install -r requirements.txt   # installs streamlit and the rest of the pipeline's dependencies
 pytest                        # sanity check: package imports correctly
+```
+
+### Running the pricing app
+
+```bash
+python scripts/download_data.py
+python scripts/prepare_data.py
+python scripts/split_data.py
+python scripts/build_model_table.py
+python scripts/build_pure_premium_table.py
+python scripts/fit_severity_model.py
+streamlit run app/app.py
 ```
 
 ## Status
@@ -201,4 +214,27 @@ modelling, evaluation, fairness, deployment) into one reference document; the mo
 was updated twice to incorporate both follow-on steps' findings rather than left as
 originally written.
 
-Next: Phase 10, the Streamlit pricing application.
+**Phase 10, step 1 complete:** single-policy pure-premium calculator
+(`app/app.py`, `app/pricing.py`). Loads the GLM champion pipeline (paid-frequency
+Poisson GLM × lognormal severity GLM) from lightweight joblib artifacts and prices
+one user-entered policy at a time. Two real gaps were found and fixed while building
+this, both in code that already claimed to support it: `predict_from_artifact`
+(frequency.py) and the new `predict_severity_from_artifact` (severity.py) both raised
+`NameError` on a genuinely new policy with no known target value, because patsy's
+formula parser requires the left-hand-side column to be *present* in the data even
+though prediction only uses the right-hand side — confirmed empirically before fixing,
+not assumed. Both now synthesize a dummy target column internally, with regression
+tests added. A new `engineer_single_policy` function (`features.py`) reuses every
+Phase 4 transform unchanged so the app can never drift from how the models were
+actually trained; a new `save_severity_model`/`predict_severity_from_artifact` pair
+(mirroring Phase 5's frequency artifact format) avoids repeating the 878MB-pickle
+mistake for the severity model. The app itself is tested two ways: plain pytest for
+`app/pricing.py`'s logic, and Streamlit's own `AppTest` harness (which actually
+executes the script and can click its button) for the UI — confirmed during testing
+that hitting a running server with plain HTTP only fetches its static JS shell and
+never executes the Python script at all, so that approach would have missed a real
+bug. The app surfaces Phase 9's fairness findings and the model-card disclaimer
+directly in its UI, not just in the reports.
+
+Next: Phase 10, steps 2-3 — a model-exploration/relativities dashboard and a
+governance page, plus final packaging.

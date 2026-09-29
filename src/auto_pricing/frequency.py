@@ -200,7 +200,20 @@ def predict_from_artifact(artifact: dict, df: pd.DataFrame) -> pd.Series:
     which by definition can only ever show one category per column. This
     is not a hypothetical edge case: it is exactly the situation a
     real-time pricing app (Phase 10) needs to handle correctly.
+
+    Also works when `df` has no target column at all - the realistic
+    Phase 10 case, since a brand-new policy's claim count is exactly what
+    is being predicted, not something already known. Confirmed while
+    building the app: patsy's formula parser raises `NameError` while
+    building the design matrix if the LHS variable is entirely absent from
+    `df`, even though prediction only ever uses the RHS - so a dummy
+    target column is assigned here before building the (unfit) model, to
+    be discarded immediately after. Its value is never used by
+    `.predict(params)`, only its presence is needed.
     """
+    target_col = artifact["formula"].split("~", 1)[0].strip()
+    if target_col not in df.columns:
+        df = df.assign(**{target_col: 0})
     offset = np.log(df["Exposure"])
     if artifact["model_type"] == "poisson":
         model = smf.glm(formula=artifact["formula"], data=df, family=sm.families.Poisson(), offset=offset)

@@ -187,3 +187,31 @@ def test_save_and_reload_artifact_round_trips_via_joblib(tmp_path):
     assert np.allclose(reconstructed, correct)
     assert loaded["aic"] == result.aic
     assert loaded["converged"] is True
+
+
+def test_predict_from_artifact_works_when_target_column_is_entirely_absent():
+    # The real Phase 10 scenario: a brand-new policy's claim count is what
+    # is being predicted, so it can never already be a column in the input
+    # - unlike every other test above, which (like real validation/test
+    # slices) happens to already carry the target column. Confirmed while
+    # building the app that omitting it entirely raised patsy's NameError
+    # while building the design matrix, even though prediction never uses
+    # the target's values - only the RHS. predict_from_artifact must
+    # synthesize a dummy target column rather than require the caller to.
+    # Uses a declared-categories Categorical (like the single-row test
+    # above) so this isolates the missing-target-column behavior alone,
+    # not the separate single-row design-matrix-width bug.
+    n = 200
+    rng = np.random.default_rng(0)
+    exposure = rng.uniform(0.1, 1.0, n)
+    group = pd.Categorical(rng.choice(["A", "B", "C"], n), categories=["A", "B", "C"])
+    claim_nb = rng.poisson(0.1 * exposure)
+    train = pd.DataFrame({"ClaimNb": claim_nb, "Exposure": exposure, "group": group})
+
+    result = fit_poisson_glm(train, formula="ClaimNb ~ C(group)")
+    artifact = {"formula": "ClaimNb ~ C(group)", "model_type": "poisson", "params": result.params}
+
+    new_policy = train.iloc[[0]].drop(columns=["ClaimNb"])
+    reconstructed = predict_from_artifact(artifact, new_policy)
+    correct = predict_frequency(result, train.iloc[[0]])
+    assert np.allclose(reconstructed, correct)

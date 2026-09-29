@@ -18,6 +18,9 @@ matters, rather than guessing a smaller formula in advance.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import joblib
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -146,6 +149,58 @@ def predict_lognormal_severity(results, smearing_factor: float, df: pd.DataFrame
     correction that does.
     """
     return np.exp(results.predict(df)) * smearing_factor
+
+
+def save_severity_model(results, smearing_factor: float, formula: str, path: str | Path) -> dict:
+    """Persist a small, self-contained snapshot of the fitted lognormal
+    severity champion - the same problem frequency.py's save_frequency_model
+    solves, for the same reason: a raw pickle of an OLS results object
+    retains internal arrays sized by the training row count, not just the
+    48 fitted coefficients actually needed to predict.
+
+    The smearing factor (Duan's retransformation correction, from
+    fit_lognormal_model) is saved alongside the coefficients because
+    predict_severity_from_artifact cannot reproduce it later - it is a
+    statistic of the training residuals, not something recoverable from
+    params alone. Forgetting it would silently reintroduce the 60%
+    underprediction bug predict_lognormal_severity's docstring describes.
+    """
+    artifact = {
+        "formula": formula,
+        "model_type": "lognormal",
+        "params": results.params,
+        "smearing_factor": float(smearing_factor),
+    }
+    joblib.dump(artifact, path)
+    return artifact
+
+
+def predict_severity_from_artifact(artifact: dict, df: pd.DataFrame) -> pd.Series:
+    """Predict expected claim cost for `df` from a saved artifact
+    (save_severity_model's output) - no fitted results object needed.
+
+    Mirrors auto_pricing.frequency.predict_from_artifact: rebuilds a fresh,
+    unfit OLS model bound to df's own rows (for its design-matrix
+    machinery only), applies the saved coefficients, then reverses the log
+    and applies the saved smearing factor - the same two-step correction
+    predict_lognormal_severity requires, since `.predict(params)` on an
+    unfit model instance returns log-scale predictions, exactly like the
+    fitted version does. Requires every categorical column the formula
+    references to be a proper pandas Categorical with its full
+    training-time category list attached (see
+    auto_pricing.features.apply_common_categories) - the same single-row
+    prediction requirement frequency.py's artifact predictor has.
+
+    Also works when `df` has no `ClaimAmount` column - the realistic
+    Phase 10 case (a new policy's claim cost is what's being predicted,
+    not already known) - for the same reason and via the same dummy-column
+    fix documented in predict_from_artifact's docstring.
+    """
+    log_formula = artifact["formula"].replace("ClaimAmount", "np.log(ClaimAmount)", 1)
+    if "ClaimAmount" not in df.columns:
+        df = df.assign(ClaimAmount=1.0)
+    model = smf.ols(formula=log_formula, data=df)
+    return np.exp(model.predict(artifact["params"])) * artifact["smearing_factor"]
 
 
 def large_loss_threshold(train_df: pd.DataFrame, top_pct: float = 0.01) -> float:

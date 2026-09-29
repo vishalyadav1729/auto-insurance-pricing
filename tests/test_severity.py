@@ -4,6 +4,7 @@ Uses small hand-built / synthetic data so these run fast while still
 exercising the real statsmodels Gamma GLM fit/predict mechanics.
 """
 
+import joblib
 import numpy as np
 import pandas as pd
 
@@ -16,6 +17,8 @@ from auto_pricing.severity import (
     large_loss_threshold,
     predict_lognormal_severity,
     predict_severity,
+    predict_severity_from_artifact,
+    save_severity_model,
 )
 
 
@@ -165,3 +168,53 @@ def test_exclude_large_losses_drops_claims_at_or_above_threshold():
     df = pd.DataFrame({"ClaimAmount": [100.0, 500.0, 1000.0, 5000.0]})
     out = exclude_large_losses(df, threshold=1000.0)
     assert out["ClaimAmount"].tolist() == [100.0, 500.0]  # 1000.0 itself excluded too
+
+
+def test_predict_severity_from_artifact_matches_predict_lognormal_severity():
+    train = _synthetic_severity_train()
+    result, smearing_factor = fit_lognormal_model(train, formula="ClaimAmount ~ C(group)")
+    artifact = {
+        "formula": "ClaimAmount ~ C(group)",
+        "model_type": "lognormal",
+        "params": result.params,
+        "smearing_factor": smearing_factor,
+    }
+    reconstructed = predict_severity_from_artifact(artifact, train)
+    correct = predict_lognormal_severity(result, smearing_factor, train)
+    assert np.allclose(reconstructed, correct)
+
+
+def test_predict_severity_from_artifact_works_when_claim_amount_is_absent():
+    # Mirrors frequency.py's equivalent fix: a brand-new policy's claim
+    # cost is exactly what's being predicted, so ClaimAmount can never
+    # already be a column for the Phase 10 app's real input. Without the
+    # dummy-column fix, patsy's design-matrix construction raises
+    # NameError even though prediction never uses ClaimAmount's values.
+    # Uses a full multi-row slice (not a single row) so this isolates the
+    # missing-target-column behavior alone, not the separate single-row
+    # design-matrix-width issue predict_from_artifact's tests cover.
+    train = _synthetic_severity_train()
+    result, smearing_factor = fit_lognormal_model(train, formula="ClaimAmount ~ C(group)")
+    artifact = {
+        "formula": "ClaimAmount ~ C(group)",
+        "model_type": "lognormal",
+        "params": result.params,
+        "smearing_factor": smearing_factor,
+    }
+    new_policies = train.drop(columns=["ClaimAmount"])
+    reconstructed = predict_severity_from_artifact(artifact, new_policies)
+    correct = predict_lognormal_severity(result, smearing_factor, train)
+    assert np.allclose(reconstructed, correct)
+
+
+def test_save_and_reload_severity_artifact_round_trips_via_joblib(tmp_path):
+    train = _synthetic_severity_train()
+    result, smearing_factor = fit_lognormal_model(train, formula="ClaimAmount ~ C(group)")
+    path = tmp_path / "severity_model.joblib"
+    save_severity_model(result, smearing_factor, formula="ClaimAmount ~ C(group)", path=path)
+
+    loaded = joblib.load(path)
+    reconstructed = predict_severity_from_artifact(loaded, train)
+    correct = predict_lognormal_severity(result, smearing_factor, train)
+    assert np.allclose(reconstructed, correct)
+    assert loaded["smearing_factor"] == smearing_factor

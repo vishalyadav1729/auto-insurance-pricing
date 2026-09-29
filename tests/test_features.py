@@ -17,6 +17,7 @@ from auto_pricing.features import (
     clip_exposure,
     encode_area_ordinal,
     encode_vehgas_binary,
+    engineer_single_policy,
     exclude_orphan_claims,
     fit_common_categories,
     log_density,
@@ -193,3 +194,52 @@ def test_build_model_table_adds_expected_engineered_columns():
         "AreaOrdinal", "VehGasBinary", "RegionGrouped", "VehBrandGrouped",
     ]:
         assert col in model_table.columns
+
+
+def _sample_raw_policy():
+    return {
+        "Area": "D", "VehPower": 7, "VehAge": 2, "DrivAge": 35, "BonusMalus": 50,
+        "VehBrand": "B1", "VehGas": "Diesel", "Density": 1500, "Region": "R24",
+        "Exposure": 1.0,
+    }
+
+
+def test_engineer_single_policy_adds_every_engineered_column():
+    category_maps = {"Region": {"R24"}, "VehBrand": {"B1"}}
+    row = engineer_single_policy(_sample_raw_policy(), category_maps)
+    assert len(row) == 1
+    for col in [
+        "DrivAgeBand", "VehAgeBand", "BonusMalusBand", "LogDensity",
+        "AreaOrdinal", "VehGasBinary", "RegionGrouped", "VehBrandGrouped",
+    ]:
+        assert col in row.columns
+    assert row["DrivAgeBand"].iloc[0] == "30-39"
+    assert row["RegionGrouped"].iloc[0] == "R24"
+    assert row["VehBrandGrouped"].iloc[0] == "B1"
+
+
+def test_engineer_single_policy_pools_a_category_never_seen_as_common():
+    # The exact mechanism a deployed app needs for free (apply_common_categories'
+    # own docstring): a Region/VehBrand this policy reports that ISN'T in
+    # category_maps (whether genuinely rare or simply never seen during
+    # training) must fall back to "Other", not raise or silently create a
+    # new category the trained model has no coefficient for.
+    category_maps = {"Region": {"R24"}, "VehBrand": {"B1"}}
+    raw = dict(_sample_raw_policy(), Region="R99", VehBrand="B99")
+    row = engineer_single_policy(raw, category_maps)
+    assert row["RegionGrouped"].iloc[0] == "Other"
+    assert row["VehBrandGrouped"].iloc[0] == "Other"
+
+
+def test_engineer_single_policy_declares_the_full_category_list():
+    # Matches apply_common_categories' own documented requirement: the
+    # returned column must be a Categorical with every trained category
+    # declared, even though a single row can only ever show one of them -
+    # otherwise a formula-based model builds the wrong-width design matrix
+    # for this row (the exact bug predict_from_artifact's tests guard
+    # against on the modelling side; this is the feature-engineering side
+    # of the same requirement).
+    category_maps = {"Region": {"R24", "R11", "R82"}, "VehBrand": {"B1", "B2"}}
+    row = engineer_single_policy(_sample_raw_policy(), category_maps)
+    assert set(row["RegionGrouped"].cat.categories) == {"R24", "R11", "R82", "Other"}
+    assert set(row["VehBrandGrouped"].cat.categories) == {"B1", "B2", "Other"}

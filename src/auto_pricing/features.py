@@ -268,3 +268,34 @@ def build_model_table(
     )
 
     return merged, category_maps
+
+
+def engineer_single_policy(raw_policy: dict, category_maps: dict[str, set[str]]) -> pd.DataFrame:
+    """Apply every Phase 4 feature-engineering step to ONE brand-new policy
+    (the Phase 10 app's use case), not a training-time DataFrame slice.
+
+    `raw_policy` must supply the same raw fields freMTPL2freq does: `Area`,
+    `VehPower`, `VehAge`, `DrivAge`, `BonusMalus`, `VehBrand`, `VehGas`,
+    `Density`, `Region`, `Exposure` - exactly what a real quote form would
+    collect, before any of this module's transforms are applied.
+    `category_maps` must be the exact dict `build_model_table` returned
+    when the deployed models were trained (persisted at
+    artifacts/preprocessors/rare_category_maps.joblib) - using a
+    different or newly-fit one would silently price this policy against
+    a different Region/VehBrand grouping than the model actually learned.
+
+    Wraps `raw_policy` in a single-row DataFrame and reuses the exact same
+    functions build_model_table calls (add_age_and_bonusmalus_bands,
+    log_density, encode_area_ordinal, encode_vehgas_binary,
+    apply_common_categories) rather than reimplementing any of them, so a
+    change to a bin edge or the ordinal mapping can never drift between
+    training and this app-facing path.
+    """
+    df = pd.DataFrame([raw_policy])
+    df = add_age_and_bonusmalus_bands(df)
+    df = log_density(df)
+    df = encode_area_ordinal(df)
+    df = encode_vehgas_binary(df)
+    df["RegionGrouped"] = apply_common_categories(df["Region"], category_maps["Region"])
+    df["VehBrandGrouped"] = apply_common_categories(df["VehBrand"], category_maps["VehBrand"])
+    return df
