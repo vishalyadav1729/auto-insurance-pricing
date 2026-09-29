@@ -207,3 +207,48 @@ pricing calculator (step 1), the model-exploration dashboard (step 2), and this 
 page (step 3) — none of the analytical findings live only in markdown anymore; the same
 numbers and disclosures a reader would find in `reports/` are reachable from the running
 app itself.
+
+**Phase 11 complete:** README overhaul (moving the phase-by-phase log here, to this file,
+and rewriting `README.md` itself as a recruiter-facing front page with a Key Results
+section), `docs/INTERVIEW_PREP.md` (real interview Q&A grounded in this project's actual
+verified numbers), and a final repo-polish pass that found and fixed a real drift between
+`pyproject.toml` and `requirements.txt` (`SQLAlchemy` declared but never imported anywhere;
+`streamlit` missing from `pyproject.toml` entirely) plus added an MIT license.
+
+**Deployed to Streamlit Community Cloud** at `riskrate.streamlit.app`. Before that could
+work, a real deploy-blocking bug was found and fixed: `requirements.txt` only listed
+external PyPI packages, never telling pip to install the local `auto_pricing` package
+itself — confirmed directly in a from-scratch venv that `import auto_pricing` failed with
+`ModuleNotFoundError` under exactly the install command Streamlit Cloud uses. Fixed with a
+single `-e .` line, verified in a second fresh venv before pushing. The lightweight model
+artifacts (previously gitignored, all under 14KB each) were committed to git specifically
+so the deployed app doesn't need to re-run the ~3-minute data pipeline on every cold start.
+
+**Visual redesign, done in two passes.** The first pass added a custom theme
+(`.streamlit/config.toml`), shared CSS (`app/styling.py`, applied once from the router
+since Streamlit re-executes the entrypoint on every page load), card-style bordered
+containers, and a styled headline number for the pure premium result. Direct feedback on
+the deployed result asked for a second pass: every icon/emoji removed from the sidebar nav
+and browser tab, `layout="wide"` (the centered layout was leaving large unused side
+margins), a blue accent color and deeper blue-toned background replacing the original teal,
+and moderately larger fonts for the sidebar nav and policy-detail widget labels.
+
+**AWS S3 + Athena SQL cross-validation** (`sql/`, `reports/sql_cross_validation.md`). This
+project's README originally promised "SQL-based data preparation" from an earlier, simpler
+plan the 11-phase blueprint superseded — no SQL had actually been used anywhere until this.
+Raw `freMTPL2freq.csv`/`freMTPL2sev.csv` uploaded to S3; two external tables defined via
+`CREATE EXTERNAL TABLE` in Athena, deliberately skipping Glue Crawlers and Glue ETL jobs
+(both bill per DPU-hour; Athena's own DDL registers table metadata in the Glue Data Catalog
+for free). Four SQL queries independently re-derived the portfolio frequency (0.100614 vs.
+the established 0.1006), the portfolio pure premium (€167.176 vs. €167.18), and the exact
+orphan-claim figures from Phase 3 (€788,714.18 / 195 rows / 6 policies) — every one matched
+the pandas-computed value exactly, a genuine cross-engine correctness check (Presto/Trino
+vs. pandas), not a demo run for its own sake. A fifth query aggregated frequency by
+`BonusMalus` band in SQL, reproducing the same monotonically increasing pattern Phase 3 and
+Phase 5 already established — explicitly *not* presented as reproducing the GLM's
+multivariate relativity, since a naive per-band rate and a regression coefficient holding
+other factors constant are different quantities that happen to agree qualitatively here.
+Total cost across every query run while building this: under a tenth of a cent (~163MB
+scanned at Athena's $5/TB rate) — Glue Crawlers/Jobs and QuickSight, the two AWS services
+identified in advance as the ones that could actually cost real money for this kind of
+workload, were both avoided entirely.

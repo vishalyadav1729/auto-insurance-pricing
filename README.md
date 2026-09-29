@@ -43,6 +43,11 @@ phase-by-phase account, including every bug found and fixed along the way.
   size alone; the dataset has no demographic fields at all, so no fairness/proxy-variable
   audit is actually possible on it — stated plainly rather than implied as checked
   (`reports/limitations.md`, `reports/fairness_analysis.md`).
+- **Independently re-derived in SQL, not just pandas**: the raw data was loaded into S3
+  and queried via AWS Athena (`CREATE EXTERNAL TABLE`, no Glue Crawlers/Jobs) to re-compute
+  the portfolio frequency, pure premium, and orphan-claim figures above from scratch in a
+  completely different engine — every number matched exactly. Total cost: under a tenth of
+  a cent (`reports/sql_cross_validation.md`).
 
 ## The pricing app
 
@@ -73,8 +78,11 @@ offsets, Duan smearing correction, large-loss sensitivity analysis), rigorous ML
 exactly once per pipeline to confirm), honest model evaluation (a scorecard across
 deviance, calibration, ranking, interpretability, and governance burden — not picking a
 winner from one metric), responsible-AI awareness (a model card, a fairness analysis that
-states what it cannot verify, a consolidated limitations document), and shipping a real,
-tested, interactive application on top of it all.
+states what it cannot verify, a consolidated limitations document), shipping a real,
+tested, interactive application on top of it all, and basic cloud/data-engineering
+literacy (S3, Athena, and cost-conscious architecture decisions — e.g. skipping Glue
+Crawlers specifically because they bill per DPU-hour where a plain `CREATE EXTERNAL
+TABLE` doesn't).
 
 ## Repository structure
 
@@ -88,6 +96,7 @@ auto-insurance-pricing/
 ├── reports/            # every modelling decision, relativity table, and governance document
 ├── tests/              # pytest suite (123 tests) covering src/auto_pricing and app/
 ├── app/                # the three-page Streamlit application (Phase 10)
+├── sql/                # Athena DDL and cross-validation queries (AWS S3 + Athena)
 └── docs/               # BUILD_LOG.md: the detailed, phase-by-phase build history
 ```
 
@@ -115,7 +124,8 @@ streamlit run app/app.py
 
 ## Tools
 
-Python, pandas, statsmodels, scikit-learn, Streamlit, Jupyter, pytest, Git and GitHub.
+Python, pandas, statsmodels, scikit-learn, Streamlit, Jupyter, pytest, Git and GitHub,
+AWS (S3, Athena).
 
 ## Further reading
 
@@ -123,8 +133,9 @@ Python, pandas, statsmodels, scikit-learn, Streamlit, Jupyter, pytest, Git and G
   decision, every bug found and fixed, and the reasoning behind each.
 - `docs/INTERVIEW_PREP.md` — likely interview questions about this project, answered with
   the actual verified numbers and reasoning behind each modelling decision.
-- `reports/` — nineteen reports covering data cleaning, frequency/severity/pure-premium
-  modelling, the ML challenger comparison, and model governance.
+- `reports/` — twenty reports covering data cleaning, frequency/severity/pure-premium
+  modelling, the ML challenger comparison, model governance, and the AWS SQL cross-validation.
+- `sql/` — the Athena DDL and cross-validation queries behind `reports/sql_cross_validation.md`.
 
 ## License
 

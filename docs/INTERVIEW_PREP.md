@@ -200,3 +200,36 @@ flagging that one isn't possible, and enough history to detect drift and retrain
 schedule rather than treating "the model" as a one-time artifact. I'd also expect
 production data to force real decisions about mid-term policy changes and multi-year
 customer history that this single-snapshot dataset doesn't have to represent at all.
+
+## Cloud/infrastructure
+
+**Q: I see you used AWS here — walk me through what you actually built and why.**
+
+The raw data lives in S3, queried through Athena via `CREATE EXTERNAL TABLE` — no Glue
+Crawlers or Glue ETL jobs, both of which bill per DPU-hour for something a single SQL DDL
+statement does for free (Athena registers table metadata in the Glue Data Catalog
+automatically; that catalog itself is the free part of Glue). I used it to independently
+re-derive several numbers this project already had from pandas — portfolio frequency,
+pure premium, the orphan-claim totals — in a completely different execution engine
+(Presto/Trino SQL, not pandas). Every one matched exactly, which is a real correctness
+check, not a demo for its own sake: if pandas and SQL had disagreed, that would have meant
+one of them had a bug I hadn't found yet.
+
+**Q: Why didn't you just refit the GLM in SQL too, if you were already there?**
+
+Because that would be using the wrong tool to look busy. A GLM coefficient is a
+maximum-likelihood estimate — a genuine statistical model fit, not an aggregation. SQL is
+the right tool for the data-preparation and descriptive-aggregation work I actually used it
+for (the BonusMalus band-level frequency table in `reports/sql_cross_validation.md` is a
+naive per-band rate, and I say so explicitly — it is *not* presented as reproducing the
+GLM's multivariate relativity, which holds every other factor constant and SQL's GROUP BY
+does not). Conflating the two would be a real mistake, not a shortcut worth taking.
+
+**Q: How much did this cost you?**
+
+Under a tenth of a cent, total. Every query I ran while building this scanned a combined
+~163MB, and Athena bills $5 per TB scanned — the actual dataset is tiny (34MB raw), so
+every query stayed far below any meaningful cost. The two AWS services that *can* get
+expensive for this kind of workload are Glue Crawlers/ETL jobs and QuickSight (a paid
+subscription after a 30-day trial); I specifically avoided both and can explain exactly
+why for either one if asked.
