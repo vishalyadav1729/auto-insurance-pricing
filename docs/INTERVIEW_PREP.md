@@ -233,3 +233,37 @@ every query stayed far below any meaningful cost. The two AWS services that *can
 expensive for this kind of workload are Glue Crawlers/ETL jobs and QuickSight (a paid
 subscription after a 30-day trial); I specifically avoided both and can explain exactly
 why for either one if asked.
+
+**Q: You mentioned a production monitoring recommendation in your model card. Did you
+actually build it, or is it just a suggestion on paper?**
+
+I built it. It's a scheduled Lambda (EventBridge, once a day) that publishes
+observed-to-expected ratio for six segments to CloudWatch, with alarms tuned to the
+already-known-bad values. I wrote an ADR before touching any infrastructure — using it
+caught a real problem at the design stage: publishing every Region/DrivAge segment
+combination as a separate CloudWatch custom metric would have cost about $18/year once past
+the free 10-metric allotment, which isn't "negligible" by the bar I'd set for this project.
+The fix was to curate the list down to the six segments already known to be worst-
+calibrated, rather than monitor everything — which is also just better monitoring design,
+not only the cheaper choice; alerting on every possible segment indiscriminately is how you
+get alert fatigue in a real system.
+
+**Q: How do you know the alarms actually work, rather than just existing?**
+
+I checked, rather than assumed. After the first full daily evaluation period completed, all
+six alarms transitioned to `ALARM` state — exactly as designed, since the thresholds were
+set specifically to trip on the real, already-known O/E values (e.g., the `Other` region
+alarms above 1.5, and its actual value is 1.83). That's a verified demonstration that this
+alerting would catch the calibration problems this project already found, not a claim I'm
+making without having watched it happen.
+
+**Q: Isn't "monitoring" a stretch here, given this is a portfolio project with no live
+data?**
+
+Fair challenge, and I say so directly in the write-up rather than let it go unstated: this
+Lambda republishes the same static validation-set metrics on every scheduled run, since
+there's no live claims stream feeding it new data. What it demonstrates is the *operational
+pattern* — scheduled computation, publishing to a metrics system, alerting on thresholds — a
+real deployment would use, not genuine production telemetry. I'd rather be upfront about
+that limitation than let the word "monitoring" imply something this project can't actually
+back up.

@@ -252,3 +252,32 @@ Total cost across every query run while building this: under a tenth of a cent (
 scanned at Athena's $5/TB rate) — Glue Crawlers/Jobs and QuickSight, the two AWS services
 identified in advance as the ones that could actually cost real money for this kind of
 workload, were both avoided entirely.
+
+**AWS Lambda + CloudWatch monitoring implementation** (`docs/adr/0001-production-monitoring-architecture.md`,
+`reports/monitoring_architecture.md`, `lambda/monitoring/`). The model card's own
+retraining/monitoring recommendation — production monitoring of observed-to-expected ratio
+by Region and DrivAge band — had only ever been written down, never implemented, until
+this. Used the `engineering:architecture` skill to produce a proper ADR before building
+anything, which caught a real cost problem at the design stage: publishing all ~15
+Region/DrivAgeBand segment combinations as separate CloudWatch custom metrics would cost
+~$18/year once past the free 10-metric allotment, not the "negligible" bar this project set
+for AWS work. Fixed by curating the segment list down to the 6 already-known worst
+performers (Region `Other`/`R41`/`R24`; DrivAge `60-69`/`70+`/`40-49`) — a genuine
+engineering trade-off (avoiding both cost and alert fatigue), not just a cost dodge.
+
+Architecture: `scripts/compute_monitoring_metrics.py` recomputes each curated segment's O/E
+from the GLM champion against the validation split and uploads a small JSON summary to S3;
+an EventBridge rule (`rate(1 day)`) invokes a boto3-only Lambda (no pandas/numpy needed,
+since inference already happened locally) that republishes the summary as CloudWatch custom
+metrics; 6 alarms have thresholds set to trip on the already-known-bad values; a dashboard
+visualizes all of it. Every recomputed O/E value matched the already-published Phase 7/9
+numbers exactly (e.g. Region `Other`: 1.8292 here vs. 1.83 published) — confirming no drift
+between the persisted model artifacts and the original findings. After manually invoking the
+Lambda, confirmed via `aws cloudwatch get-metric-statistics` that the published value matched
+the source data exactly, and — after the first full daily evaluation period completed —
+**all 6 alarms transitioned to `ALARM` state**, a concrete, verified demonstration that this
+alerting would have caught the calibration problems this project already found, not just a
+theoretical claim. All infrastructure-as-code (IAM policies, dashboard definition, and
+`deploy.sh` recording the exact AWS CLI commands used) committed to the repo rather than left
+as untracked console clicks. Total cost: $0/year, confirmed against CloudWatch's free-tier
+metric/alarm/dashboard allotments.

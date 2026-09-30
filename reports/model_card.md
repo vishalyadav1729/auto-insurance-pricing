@@ -235,7 +235,10 @@ Full analysis and evidence in `reports/fairness_analysis.md` (Phase 9 step 1). S
   DrivAge band**, specifically, given the documented and unresolved segment-level
   miscalibration in both (Phase 7 step 4; Phase 9 step 1) — aggregate portfolio-level
   O/E being healthy does not imply either dimension's health (this project found the
-  opposite directly for both).
+  opposite directly for both). **Implemented**, not just recommended: a scheduled
+  AWS Lambda publishes O/E for the 6 worst-known segments to CloudWatch, with alarms
+  tuned to the already-known-bad values — all 6 fired as designed once the daily
+  evaluation period completed. See `reports/monitoring_architecture.md`.
 - **Recommend re-running the large-loss sensitivity check periodically** on any
   retrained model, given how repeatedly this project found top-1%-of-claims sensitivity
   to be diagnostic (it's what first revealed the Gamma GLM's Region/VehBrand overfitting

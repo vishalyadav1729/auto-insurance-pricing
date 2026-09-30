@@ -1,0 +1,132 @@
+{
+  "widgets": [
+    {
+      "type": "text",
+      "x": 0, "y": 0, "width": 24, "height": 2,
+      "properties": {
+        "markdown": "# RiskRate — Segment Calibration Monitoring\nObserved-to-expected (O/E) ratio for the 6 curated worst-calibrated segments (ADR-0001). 1.0 = perfectly calibrated. This is a scheduled batch job re-publishing the same static validation-set metrics each run (no live claims stream in this portfolio project) — it demonstrates the operational pattern, not live production telemetry."
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 2, "width": 12, "height": 6,
+      "properties": {
+        "title": "O/E by Region",
+        "view": "bar",
+        "region": "ca-central-1",
+        "metrics": [
+          ["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "Region", "SegmentValue", "Other", {"label": "Other"}],
+          ["...", "R41", {"label": "R41"}],
+          ["...", "R24", {"label": "R24 (largest)"}]
+        ],
+        "period": 86400,
+        "stat": "Average",
+        "yAxis": {"left": {"min": 0, "max": 2}}
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 2, "width": 12, "height": 6,
+      "properties": {
+        "title": "O/E by DrivAge band",
+        "view": "bar",
+        "region": "ca-central-1",
+        "metrics": [
+          ["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "DrivAgeBand", "SegmentValue", "60-69", {"label": "60-69"}],
+          ["...", "70+", {"label": "70+"}],
+          ["...", "40-49", {"label": "40-49"}]
+        ],
+        "period": 86400,
+        "stat": "Average",
+        "yAxis": {"left": {"min": 0, "max": 2}}
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0, "y": 8, "width": 4, "height": 4,
+      "properties": {
+        "title": "Region: Other",
+        "view": "singleValue",
+        "region": "ca-central-1",
+        "metrics": [["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "Region", "SegmentValue", "Other"]],
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 4, "y": 8, "width": 4, "height": 4,
+      "properties": {
+        "title": "Region: R41",
+        "view": "singleValue",
+        "region": "ca-central-1",
+        "metrics": [["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "Region", "SegmentValue", "R41"]],
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 8, "y": 8, "width": 4, "height": 4,
+      "properties": {
+        "title": "Region: R24 (largest)",
+        "view": "singleValue",
+        "region": "ca-central-1",
+        "metrics": [["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "Region", "SegmentValue", "R24"]],
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12, "y": 8, "width": 4, "height": 4,
+      "properties": {
+        "title": "DrivAge: 60-69",
+        "view": "singleValue",
+        "region": "ca-central-1",
+        "metrics": [["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "DrivAgeBand", "SegmentValue", "60-69"]],
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 16, "y": 8, "width": 4, "height": 4,
+      "properties": {
+        "title": "DrivAge: 70+",
+        "view": "singleValue",
+        "region": "ca-central-1",
+        "metrics": [["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "DrivAgeBand", "SegmentValue", "70+"]],
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 20, "y": 8, "width": 4, "height": 4,
+      "properties": {
+        "title": "DrivAge: 40-49",
+        "view": "singleValue",
+        "region": "ca-central-1",
+        "metrics": [["RiskRate/Monitoring", "ObservedToExpectedRatio", "SegmentType", "DrivAgeBand", "SegmentValue", "40-49"]],
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "alarm",
+      "x": 0, "y": 12, "width": 24, "height": 6,
+      "properties": {
+        "title": "Alarms (thresholds set to trip on the already-known-bad values)",
+        "alarms": [
+          "arn:aws:cloudwatch:ca-central-1:039892245458:alarm:riskrate-oe-region-other-high",
+          "arn:aws:cloudwatch:ca-central-1:039892245458:alarm:riskrate-oe-region-r41-low",
+          "arn:aws:cloudwatch:ca-central-1:039892245458:alarm:riskrate-oe-region-r24-low",
+          "arn:aws:cloudwatch:ca-central-1:039892245458:alarm:riskrate-oe-drivage-60-69-low",
+          "arn:aws:cloudwatch:ca-central-1:039892245458:alarm:riskrate-oe-drivage-70plus-high",
+          "arn:aws:cloudwatch:ca-central-1:039892245458:alarm:riskrate-oe-drivage-40-49-low"
+        ]
+      }
+    }
+  ]
+}

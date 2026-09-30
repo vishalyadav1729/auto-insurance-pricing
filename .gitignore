@@ -20,6 +20,10 @@ outputs/metrics/
 artifacts/models/
 artifacts/preprocessors/
 
+# Monitoring pipeline output (regenerate via scripts/compute_monitoring_metrics.py;
+# the authoritative copy lives in S3, not git)
+artifacts/monitoring/
+
 # System files
 .DS_Store
 

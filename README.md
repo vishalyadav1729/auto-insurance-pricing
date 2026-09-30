@@ -48,6 +48,11 @@ phase-by-phase account, including every bug found and fixed along the way.
   the portfolio frequency, pure premium, and orphan-claim figures above from scratch in a
   completely different engine — every number matched exactly. Total cost: under a tenth of
   a cent (`reports/sql_cross_validation.md`).
+- **The model card's monitoring recommendation is implemented, not just written down**: a
+  scheduled AWS Lambda publishes observed/expected ratio for the 6 worst-known segments to
+  CloudWatch, with alarms tuned to the already-known-bad values — all 6 fired exactly as
+  designed once the first evaluation period completed (`reports/monitoring_architecture.md`,
+  `docs/adr/0001-production-monitoring-architecture.md`). Cost: $0/year.
 
 ## The pricing app
 
@@ -79,10 +84,11 @@ exactly once per pipeline to confirm), honest model evaluation (a scorecard acro
 deviance, calibration, ranking, interpretability, and governance burden — not picking a
 winner from one metric), responsible-AI awareness (a model card, a fairness analysis that
 states what it cannot verify, a consolidated limitations document), shipping a real,
-tested, interactive application on top of it all, and basic cloud/data-engineering
-literacy (S3, Athena, and cost-conscious architecture decisions — e.g. skipping Glue
-Crawlers specifically because they bill per DPU-hour where a plain `CREATE EXTERNAL
-TABLE` doesn't).
+tested, interactive application on top of it all, and cloud/infrastructure literacy (S3,
+Athena, Lambda, EventBridge, CloudWatch; an ADR-driven design process; cost-conscious
+architecture decisions — e.g. skipping Glue Crawlers because they bill per DPU-hour where
+a plain `CREATE EXTERNAL TABLE` doesn't, and curating monitored segments to stay inside
+CloudWatch's free-tier metric allotment rather than publishing everything indiscriminately).
 
 ## Repository structure
 
@@ -94,10 +100,11 @@ auto-insurance-pricing/
 ├── data/               # raw/processed data (git-ignored; reproducible via scripts/)
 ├── artifacts/          # fitted models and preprocessors (git-ignored, regenerable)
 ├── reports/            # every modelling decision, relativity table, and governance document
-├── tests/              # pytest suite (123 tests) covering src/auto_pricing and app/
+├── tests/              # pytest suite (125 tests) covering src/auto_pricing, app/, and lambda/
 ├── app/                # the three-page Streamlit application (Phase 10)
 ├── sql/                # Athena DDL and cross-validation queries (AWS S3 + Athena)
-└── docs/               # BUILD_LOG.md: the detailed, phase-by-phase build history
+├── lambda/             # monitoring Lambda + IAM/dashboard definitions (AWS Lambda + CloudWatch)
+└── docs/               # BUILD_LOG.md (build history) and adr/ (architecture decision records)
 ```
 
 ## Setup
@@ -107,7 +114,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"           # installs the auto_pricing package + pytest/ruff
 pip install -r requirements.txt   # installs streamlit and the rest of the pipeline's dependencies
-pytest                             # sanity check: 123 tests should pass
+pytest                             # sanity check: 125 tests should pass
 ```
 
 ### Running the pricing app
@@ -125,7 +132,7 @@ streamlit run app/app.py
 ## Tools
 
 Python, pandas, statsmodels, scikit-learn, Streamlit, Jupyter, pytest, Git and GitHub,
-AWS (S3, Athena).
+AWS (S3, Athena, Lambda, EventBridge, CloudWatch).
 
 ## Further reading
 
@@ -133,9 +140,15 @@ AWS (S3, Athena).
   decision, every bug found and fixed, and the reasoning behind each.
 - `docs/INTERVIEW_PREP.md` — likely interview questions about this project, answered with
   the actual verified numbers and reasoning behind each modelling decision.
-- `reports/` — twenty reports covering data cleaning, frequency/severity/pure-premium
-  modelling, the ML challenger comparison, model governance, and the AWS SQL cross-validation.
+- `docs/adr/` — architecture decision records for infrastructure choices (e.g. why
+  Lambda+CloudWatch over Glue or QuickSight for production monitoring).
+- `reports/` — twenty-one reports covering data cleaning, frequency/severity/pure-premium
+  modelling, the ML challenger comparison, model governance, the AWS SQL cross-validation,
+  and the AWS monitoring architecture.
 - `sql/` — the Athena DDL and cross-validation queries behind `reports/sql_cross_validation.md`.
+- `lambda/monitoring/` — the monitoring Lambda, its IAM/dashboard definitions, and
+  `deploy.sh` (the exact AWS CLI commands used to build it), behind
+  `reports/monitoring_architecture.md`.
 
 ## License
 
