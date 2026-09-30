@@ -281,3 +281,23 @@ theoretical claim. All infrastructure-as-code (IAM policies, dashboard definitio
 `deploy.sh` recording the exact AWS CLI commands used) committed to the repo rather than left
 as untracked console clicks. Total cost: $0/year, confirmed against CloudWatch's free-tier
 metric/alarm/dashboard allotments.
+
+**Surfaced the AWS monitoring work on the deployed website** (`docs/adr/0002-monitoring-snapshot-not-live.md`,
+`app/pages/infrastructure.py`). Everything above was real and verified, but invisible from
+`riskrate.streamlit.app` itself — the artifact a reviewer would actually open, not a GitHub
+repo six folders deep. Considered making the new page call AWS live and rejected it: doing
+so would mean embedding AWS credentials in a public-facing app for data that only changes
+once a day at most (the monitoring Lambda's own schedule), a disproportionate security
+exposure for a purely cosmetic freshness gain — and it would visually imply more
+real-time-ness than the underlying system actually has, which conflicts with how every other
+limitation in this project has been handled (disclosed, not implied away). Instead, built
+`scripts/refresh_monitoring_snapshot.py`, run locally with credentials that never leave the
+machine, writing `app/data/monitoring_snapshot.json` for the app to read — the same
+commit-artifacts-for-deployment pattern already used to get the trained models into the
+Streamlit Cloud deployment in the first place. The new "AWS Infrastructure" page (now a
+fourth app page alongside the calculator, exploration, and governance pages) displays the
+current alarm states and the Athena cross-validation summary, states its own refresh
+timestamp prominently, and explains in its own text why it isn't live — so a visitor reading
+the page gets the same reasoning as this log entry, not just the data. 129 tests pass
+project-wide (4 new: snapshot loading, staleness calculation, and an end-to-end page render
+check).

@@ -208,3 +208,55 @@ def test_app_switches_to_governance_page_and_renders_all_three_reports():
     assert len(at.markdown) == 3
     for m in at.markdown:
         assert len(m.value) > 500  # real report content, not an empty/error placeholder
+
+
+def test_load_snapshot_returns_none_when_missing(tmp_path):
+    import sys
+
+    sys.path.insert(0, str(PROJECT_ROOT / "app" / "pages"))
+    from infrastructure import load_snapshot
+
+    assert load_snapshot(tmp_path / "does_not_exist.json") is None
+
+
+def test_load_snapshot_parses_real_file(tmp_path):
+    import sys
+
+    sys.path.insert(0, str(PROJECT_ROOT / "app" / "pages"))
+    from infrastructure import load_snapshot
+
+    path = tmp_path / "snapshot.json"
+    path.write_text('{"refreshed_at": "2026-09-30T00:00:00+00:00", "alarms": []}')
+    result = load_snapshot(path)
+    assert result["refreshed_at"] == "2026-09-30T00:00:00+00:00"
+
+
+def test_hours_since_computes_elapsed_time_correctly():
+    import sys
+    from datetime import datetime, timezone
+
+    sys.path.insert(0, str(PROJECT_ROOT / "app" / "pages"))
+    from infrastructure import hours_since
+
+    refreshed_at = "2026-09-30T00:00:00+00:00"
+    now = datetime(2026, 9, 30, 6, 30, 0, tzinfo=timezone.utc)  # 6.5 hours later
+    assert hours_since(refreshed_at, now=now) == pytest.approx(6.5)
+
+
+def test_app_switches_to_infrastructure_page_without_exceptions():
+    # Requires app/data/monitoring_snapshot.json to already exist (written
+    # by scripts/refresh_monitoring_snapshot.py) - skipped, not failed, if
+    # it hasn't been generated in this environment (e.g. no AWS credentials).
+    from streamlit.testing.v1 import AppTest
+
+    snapshot_path = PROJECT_ROOT / "app" / "data" / "monitoring_snapshot.json"
+    if not snapshot_path.exists():
+        pytest.skip("app/data/monitoring_snapshot.json not generated in this environment")
+
+    at = AppTest.from_file(str(PROJECT_ROOT / "app" / "app.py"))
+    at.run(timeout=30)
+    at.switch_page("pages/infrastructure.py")
+    at.run(timeout=30)
+    assert not at.exception
+    assert len(at.title) == 1
+    assert at.title[0].value == "AWS Infrastructure"

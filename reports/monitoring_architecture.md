@@ -87,10 +87,29 @@ model artifacts and what Phase 7/9 originally found.
   worth a periodic spot-check against AWS's current pricing page, the same caveat given for
   every other AWS cost estimate in this project.
 
+## Surfacing this on the deployed website (ADR-0002)
+
+All of the above was, until this addition, only visible in this repo — not from
+`riskrate.streamlit.app` itself, the artifact most reviewers will actually open. The app's
+new **AWS Infrastructure** page shows the current CloudWatch alarm states and the Athena
+cross-validation summary, with one explicit design choice worth stating plainly: **the page
+does not call AWS live**. Doing so would require embedding AWS credentials in a
+public-facing app for data that only changes once a day at most (the Lambda's own
+schedule) — a disproportionate security exposure for a cosmetic freshness gain. Instead,
+`scripts/refresh_monitoring_snapshot.py` is run locally (credentials never leave the
+machine) and its output, `app/data/monitoring_snapshot.json`, is committed to git — the same
+pattern already used to get the trained model artifacts into the deployed app. Full
+reasoning in `docs/adr/0002-monitoring-snapshot-not-live.md`.
+
 ## Files
 
 - `docs/adr/0001-production-monitoring-architecture.md` — the design decision and options considered.
+- `docs/adr/0002-monitoring-snapshot-not-live.md` — why the website shows a refreshed
+  snapshot rather than calling AWS live.
 - `scripts/compute_monitoring_metrics.py` — computes the 6 segments' O/E and uploads to S3.
+- `scripts/refresh_monitoring_snapshot.py` — pulls current CloudWatch alarm state, writes
+  `app/data/monitoring_snapshot.json` for the website to display.
 - `lambda/monitoring/lambda_function.py` — the monitoring Lambda.
 - `lambda/monitoring/deploy.sh` — the exact AWS CLI commands used to build everything.
 - `lambda/monitoring/{iam_trust_policy,iam_permissions_policy,dashboard}.json` — supporting definitions.
+- `app/pages/infrastructure.py` — the website page displaying the snapshot.

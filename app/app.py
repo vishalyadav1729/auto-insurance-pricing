@@ -27,6 +27,9 @@ exploration_page = st.Page(
 governance_page = st.Page(
     "pages/governance.py", title="Governance"
 )
+infrastructure_page = st.Page(
+    "pages/infrastructure.py", title="AWS Infrastructure"
+)
 
-pg = st.navigation([calculator_page, exploration_page, governance_page])
+pg = st.navigation([calculator_page, exploration_page, governance_page, infrastructure_page])
 pg.run()

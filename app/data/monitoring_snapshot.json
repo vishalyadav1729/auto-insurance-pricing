@@ -1,0 +1,88 @@
+{
+  "refreshed_at": "2026-09-30T13:47:07.938898+00:00",
+  "alarms": [
+    {
+      "alarm_name": "riskrate-oe-region-other-high",
+      "segment_type": "Region",
+      "segment_value": "Other",
+      "state": "ALARM",
+      "state_updated_at": "2026-09-29T18:40:22.123000-02:30",
+      "threshold": 1.5,
+      "comparison_operator": "GreaterThanThreshold"
+    },
+    {
+      "alarm_name": "riskrate-oe-region-r41-low",
+      "segment_type": "Region",
+      "segment_value": "R41",
+      "state": "ALARM",
+      "state_updated_at": "2026-09-29T18:40:07.685000-02:30",
+      "threshold": 0.6,
+      "comparison_operator": "LessThanThreshold"
+    },
+    {
+      "alarm_name": "riskrate-oe-region-r24-low",
+      "segment_type": "Region",
+      "segment_value": "R24",
+      "state": "ALARM",
+      "state_updated_at": "2026-09-29T18:40:45.519000-02:30",
+      "threshold": 0.85,
+      "comparison_operator": "LessThanThreshold"
+    },
+    {
+      "alarm_name": "riskrate-oe-drivage-60-69-low",
+      "segment_type": "DrivAgeBand",
+      "segment_value": "60-69",
+      "state": "ALARM",
+      "state_updated_at": "2026-09-29T18:40:07.572000-02:30",
+      "threshold": 0.65,
+      "comparison_operator": "LessThanThreshold"
+    },
+    {
+      "alarm_name": "riskrate-oe-drivage-70plus-high",
+      "segment_type": "DrivAgeBand",
+      "segment_value": "70+",
+      "state": "ALARM",
+      "state_updated_at": "2026-09-29T18:40:37.598000-02:30",
+      "threshold": 1.2,
+      "comparison_operator": "GreaterThanThreshold"
+    },
+    {
+      "alarm_name": "riskrate-oe-drivage-40-49-low",
+      "segment_type": "DrivAgeBand",
+      "segment_value": "40-49",
+      "state": "ALARM",
+      "state_updated_at": "2026-09-29T18:39:52.867000-02:30",
+      "threshold": 0.8,
+      "comparison_operator": "LessThanThreshold"
+    }
+  ],
+  "sql_cross_validation": {
+    "checked_at": "2026-09-29",
+    "checks": [
+      {
+        "label": "Portfolio frequency",
+        "pandas_value": "0.1006",
+        "sql_value": "0.100614",
+        "match": true
+      },
+      {
+        "label": "Portfolio pure premium",
+        "pandas_value": "\u20ac167.18",
+        "sql_value": "\u20ac167.176",
+        "match": true
+      },
+      {
+        "label": "Total claim value",
+        "pandas_value": "\u20ac60,697,930.68",
+        "sql_value": "\u20ac60,697,930.68",
+        "match": true
+      },
+      {
+        "label": "Orphan claim total",
+        "pandas_value": "\u20ac788,714.18",
+        "sql_value": "\u20ac788,714.18",
+        "match": true
+      }
+    ]
+  }
+}

@@ -267,3 +267,34 @@ pattern* — scheduled computation, publishing to a metrics system, alerting on 
 real deployment would use, not genuine production telemetry. I'd rather be upfront about
 that limitation than let the word "monitoring" imply something this project can't actually
 back up.
+
+**Q: Why does any of this AWS work show up on your deployed app, and not just in the
+GitHub repo?**
+
+Because the GitHub repo isn't what gets clicked from a resume — the live app link is. Work
+that only exists six folders deep in `reports/` is functionally invisible to someone doing
+a two-minute skim; it's an unverifiable claim on a resume rather than something they can see
+in the room. So I added an "AWS Infrastructure" page to the app itself that shows the actual
+current state of the CloudWatch alarms and a summary of the Athena cross-validation —
+turning "I built AWS monitoring" into something demonstrable in ten seconds, not something
+they have to take on faith.
+
+**Q: Why didn't you make that page call AWS live, if the goal was to demonstrate it works?**
+
+I considered it and decided against it, and that decision is itself the more interesting
+answer. Making it live means embedding AWS credentials inside a public-facing app — even
+scoped to read-only access on exactly six alarms, that's a standing, credentialed door into
+a real AWS account sitting behind no authentication, reachable by anyone who finds the URL.
+The benefit doesn't justify that risk, especially since the underlying data only changes
+once a day at most (that's the monitoring Lambda's own schedule) — a page that queried AWS
+on every load would look more real-time than the system actually is, which conflicts with
+how this project has handled every other limitation: disclosed plainly, not implied away.
+
+Instead, the page reads a snapshot file (`app/data/monitoring_snapshot.json`) that I refresh
+by running a script locally, with credentials that never leave my machine, then commit to
+git — the exact same pattern already used to get the trained model files into the deployed
+app in the first place. The write-up for this decision is
+`docs/adr/0002-monitoring-snapshot-not-live.md`. If I had more time, the natural next step
+without reintroducing the credential-exposure problem would be a scheduled GitHub Actions
+workflow — AWS credentials as encrypted CI secrets, never exposed to the public app itself —
+running this same refresh script automatically instead of by hand.

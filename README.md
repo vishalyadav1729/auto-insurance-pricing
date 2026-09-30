@@ -53,12 +53,18 @@ phase-by-phase account, including every bug found and fixed along the way.
   CloudWatch, with alarms tuned to the already-known-bad values — all 6 fired exactly as
   designed once the first evaluation period completed (`reports/monitoring_architecture.md`,
   `docs/adr/0001-production-monitoring-architecture.md`). Cost: $0/year.
+- **That AWS work is visible from the deployed app itself, not just the repo** — an
+  "AWS Infrastructure" page shows the live-as-of-last-refresh alarm states and SQL
+  cross-validation summary. Deliberately *not* wired to call AWS on every page load: doing
+  so would mean embedding AWS credentials in a public app for a system that only updates
+  once a day anyway. A snapshot refreshed and committed like the model artifacts already
+  are was the safer, more honest choice (`docs/adr/0002-monitoring-snapshot-not-live.md`).
 
 ## The pricing app
 
 **Live: [riskrate.streamlit.app](https://riskrate.streamlit.app/)**
 
-A three-page Streamlit application sits on top of the modelling pipeline — none of this
+A four-page Streamlit application sits on top of the modelling pipeline — none of this
 project's findings live only in markdown:
 
 1. **Pricing Calculator** — prices one user-entered policy through the GLM champion
@@ -68,6 +74,9 @@ project's findings live only in markdown:
    GLM-vs-ML scorecard.
 3. **Governance** — the model card, fairness analysis, and limitations documents, rendered
    directly from `reports/` so they can never drift out of sync with the app.
+4. **AWS Infrastructure** — the current (as of last refresh) state of the CloudWatch
+   alarms and Athena cross-validation built in `docs/adr/`, with an explicit explanation of
+   why it's a periodically-refreshed snapshot rather than a live AWS call.
 
 ```bash
 streamlit run app/app.py
@@ -100,8 +109,9 @@ auto-insurance-pricing/
 ├── data/               # raw/processed data (git-ignored; reproducible via scripts/)
 ├── artifacts/          # fitted models and preprocessors (git-ignored, regenerable)
 ├── reports/            # every modelling decision, relativity table, and governance document
-├── tests/              # pytest suite (125 tests) covering src/auto_pricing, app/, and lambda/
-├── app/                # the three-page Streamlit application (Phase 10)
+├── tests/              # pytest suite (129 tests) covering src/auto_pricing, app/, and lambda/
+├── app/                # the four-page Streamlit application (Phase 10; data/ holds the
+│                       #   committed AWS monitoring snapshot, see ADR-0002)
 ├── sql/                # Athena DDL and cross-validation queries (AWS S3 + Athena)
 ├── lambda/             # monitoring Lambda + IAM/dashboard definitions (AWS Lambda + CloudWatch)
 └── docs/               # BUILD_LOG.md (build history) and adr/ (architecture decision records)
@@ -114,7 +124,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"           # installs the auto_pricing package + pytest/ruff
 pip install -r requirements.txt   # installs streamlit and the rest of the pipeline's dependencies
-pytest                             # sanity check: 125 tests should pass
+pytest                             # sanity check: 129 tests should pass
 ```
 
 ### Running the pricing app
@@ -140,8 +150,9 @@ AWS (S3, Athena, Lambda, EventBridge, CloudWatch).
   decision, every bug found and fixed, and the reasoning behind each.
 - `docs/INTERVIEW_PREP.md` — likely interview questions about this project, answered with
   the actual verified numbers and reasoning behind each modelling decision.
-- `docs/adr/` — architecture decision records for infrastructure choices (e.g. why
-  Lambda+CloudWatch over Glue or QuickSight for production monitoring).
+- `docs/adr/` — architecture decision records for infrastructure choices: ADR-0001 (why
+  Lambda+CloudWatch over Glue or QuickSight for production monitoring) and ADR-0002 (why
+  the website shows a refreshed snapshot of that monitoring rather than calling AWS live).
 - `reports/` — twenty-one reports covering data cleaning, frequency/severity/pure-premium
   modelling, the ML challenger comparison, model governance, the AWS SQL cross-validation,
   and the AWS monitoring architecture.
