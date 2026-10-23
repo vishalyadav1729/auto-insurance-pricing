@@ -91,9 +91,10 @@ reusing Phase 5's exact formula. Reconciliation: exact for frequency alone (rati
 0.9931 combined with severity. Compared against a direct Tweedie GLM (power=1.5, chosen via a
 fair fixed-evaluation-power grid search): **champion is Frequency × Severity**, winning on
 deviance (65.44 vs. 67.89), calibration, and risk-ranking (Gini 0.30 vs. 0.26) — Tweedie's
-calibration reversed sharply between train (+23%) and validation (−32%), investigated but not
-fully explained (ruled out Phase 6's Gamma-overfitting mechanism; disclosed as open rather
-than forced). A real methodology bug was caught before publishing any Gini result: ranking by
+over-prediction grew from 23.2% on training to 46.8% on validation (both relative to observed
+claims). The larger gap was investigated but not fully explained (ruled out Phase 6's
+Gamma-overfitting mechanism; disclosed as open rather than forced). A real methodology bug was
+caught before publishing any Gini result: ranking by
 raw expected loss instead of annualized rate gave a non-discriminating baseline a misleadingly
 negative Gini (−0.31 vs. the correct −0.02) — fixed in `evaluation.py`, locked in with a
 regression test. **First and only test-set check** of the already-chosen champion confirms

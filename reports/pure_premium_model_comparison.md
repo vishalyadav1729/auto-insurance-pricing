@@ -20,7 +20,7 @@ Decision record comparing three pure-premium candidates on the **validation spli
 | Direct Tweedie | 67.8935 (worst) | **0.6813 (worst)** | 0.2584 |
 
 **Frequency × Severity wins on every metric tested.** It has the lowest deviance, calibration
-comparable to the baseline (both moderately under-predict the validation portfolio), and by
+comparable to the baseline (both moderately over-predict the validation portfolio), and by
 far the best risk-ranking power. The direct Tweedie GLM is the worst performer on both
 deviance and calibration, despite being fit with the same features and a defensibly-chosen
 power parameter.
@@ -35,13 +35,14 @@ was adopted: the standard actuarial default, and empirically only 0.36% behind t
 best-tested value. `power=1.9` failed to converge during exploration and was not pursued
 further.
 
-## A real surprise, investigated rather than assumed away: Tweedie's calibration reverses between train and validation
+## Tweedie's over-prediction grows from training to validation
 
-On **training** data, the Tweedie GLM *over*-predicts total claim cost by 23% (ratio 1.2315).
-On **validation**, it *under*-predicts by 32% (ratio 0.6813) — a dramatic reversal in
-direction, not just magnitude.
+On **training** data, the Tweedie GLM over-predicts total claim cost by 23.2% relative to
+observed claims (predicted/observed = 1.2315). On **validation**, it also over-predicts:
+O/E = 0.6813 means observed claims are 31.9% below predictions, or predictions are 46.8%
+above observed claims. The calibration gap grows, but the direction of the error stays the same.
 
-Phase 6 found an analogous problem for the Gamma severity model: overfitting traced to
+Phase 6 found a calibration problem for the Gamma severity model: overfitting traced to
 `Region`/`VehBrand` (26 of 48 parameters), fixed by dropping them. The same fix was tried here
 and **did not resolve it**: dropping `Region`/`VehBrand` from the Tweedie formula barely moved
 validation O/E (0.6813 → 0.6786) — a materially different result from Gamma's case, checked

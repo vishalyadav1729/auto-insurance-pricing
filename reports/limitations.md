@@ -113,11 +113,12 @@ baseline before the bug was found and fixed. The fix is now locked in by a regre
 test, but it's a reminder that ranking metrics can fail silently in ways portfolio-level
 calibration metrics won't catch. (`reports/pure_premium_model_comparison.md`)
 
-**12. The direct Tweedie GLM showed an unexplained calibration reversal between train
-and validation** (+23% train, −32% validation) that was investigated (ruled out Phase
-6's Gamma-overfitting mechanism specifically) but never fully explained. It was not
-selected as champion for other reasons (worse deviance, worse Gini), so this was disclosed
-as an open finding rather than a blocking one — but it means Tweedie GLMs, as a class,
+**12. The direct Tweedie GLM over-predicted on both train and validation, with a larger
+validation gap** (23.2% and 46.8% above observed claims, respectively). The larger gap was
+investigated (ruled out Phase 6's Gamma-overfitting mechanism specifically) but never fully
+explained. It was not selected as champion for other reasons (worse deviance, worse Gini), so
+this was disclosed as an open finding rather than a blocking one — but it means Tweedie GLMs,
+as a class,
 were not as thoroughly understood in this project as the Frequency × Severity champion
 was. (`reports/pure_premium_model_comparison.md`)
 
@@ -180,7 +181,7 @@ should not be read as "what a customer would actually pay."
 
 It does not re-litigate or re-decide any of the above — every item here was already
 investigated, checked against plausible alternative explanations where relevant (segment
-size for Region and DrivAge O/E; Gamma-overfitting for Tweedie's reversal; age
+size for Region and DrivAge O/E; Gamma-overfitting for Tweedie's calibration gap; age
 composition for Region's miscalibration), and disclosed at the point it was found. This
 document's only job is to make all of it findable in one place, for anyone evaluating
 this project or its model card without having read all sixteen prior reports.

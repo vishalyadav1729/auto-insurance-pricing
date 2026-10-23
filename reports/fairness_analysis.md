@@ -80,7 +80,7 @@ compositions inherit some of DrivAge's own miscalibration pattern.
 | R31 | 40.9 (youngest) | — |
 
 **Checked directly and found insufficient to explain the pattern, consistent with how this
-project has handled similar open questions before (Tweedie's calibration reversal, Phase 7 step
+project has handled similar open questions before (Tweedie's calibration gap, Phase 7 step
 3; Region O/E vs. exposure size, Phase 7 step 4).** R41 (oldest mean age) is the most
 over-predicted region — consistent with the DrivAge finding that older working-age drivers are
 over-predicted. But R93 (second-oldest mean age, very close to R41) is *under*-predicted, and

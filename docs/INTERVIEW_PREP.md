@@ -48,10 +48,10 @@ two separate frequency and severity models?**
 
 I built and compared both. The direct Tweedie GLM (power=1.5) was competitive but lost on
 every metric that mattered — deviance (67.89 vs. the champion's 65.44), calibration, and
-Gini (0.26 vs. 0.30) — and showed an unexplained calibration reversal between train (+23%
-over-prediction) and validation (−32%) that I investigated (ruled out the same overfitting
-mechanism that hurt Gamma severity) but couldn't fully explain. I disclosed that as an open
-finding rather than force a tidier story. The frequency × severity decomposition also has a
+Gini (0.26 vs. 0.30) — and over-predicted total claims on both training (23.2% above
+observed) and validation (46.8% above observed). I investigated the larger validation gap,
+ruled out the same overfitting mechanism that hurt Gamma severity, and disclosed the cause as
+unresolved. The frequency × severity decomposition also has a
 practical advantage Tweedie doesn't: it lets you inspect and defend each component
 separately, which matters for both governance and business communication.
 

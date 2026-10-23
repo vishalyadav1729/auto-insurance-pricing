@@ -68,7 +68,7 @@ instead it ranges from 0.46 to 1.83, real heterogeneity beyond the aggregate shi
 explained away by segment size alone.
 
 **This is disclosed as a genuine, open limitation, not resolved here.** Consistent with how
-Tweedie's unexplained calibration reversal was handled in step 3: one plausible explanation
+Tweedie's unexplained calibration gap was handled in step 3: one plausible explanation
 was checked (segment size) and found insufficient to fully explain the pattern, and rather
 than force a tidier story, this is recorded as real evidence that **regional-level pricing
 decisions should not be taken directly from this model without further investigation** — even
@@ -83,9 +83,9 @@ real miscalibration in specific segments.
 | Validation (already seen, used for selection) | 65.4363 | 0.8430 | 0.3016 |
 | **Test (touched here, once, for the first time)** | **59.5602** | **0.8497** | **0.2701** |
 
-All three metrics land close to their validation values — no dramatic reversal like Tweedie's
-train-to-validation swing (Phase 7, step 3). Deviance is actually slightly better on test;
-O/E is nearly identical (0.843 vs. 0.850); Gini is modestly lower but the same order of
+All three metrics land close to their validation values, unlike Tweedie's larger
+train-to-validation calibration gap (Phase 7, step 3). Deviance is actually slightly better on
+test; O/E is nearly identical (0.843 vs. 0.850); Gini is modestly lower but the same order of
 magnitude. This is the reassuring result: the champion's validation-based selection was not
 an artifact of validation-specific noise, confirmed on data that had never influenced any
 decision in this project until this moment.

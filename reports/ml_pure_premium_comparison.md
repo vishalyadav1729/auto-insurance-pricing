@@ -15,10 +15,11 @@ boosting from step 1, severity boosting from step 2), on validation.
 
 **The boosted pipeline wins on every aggregate metric.** Deviance improves 1.3% over the GLM
 champion; Gini improves 8.9%; and calibration improves dramatically — O/E of 1.0108 is
-essentially exact, versus the GLM's 0.8430 (16% under-calibrated) and Tweedie's 0.6813 (32%
-under-calibrated). The combined effect is larger than either component challenger's individual
-edge (frequency: +3.0% deviance, Step 1; severity: +0.38% deviance, Step 2) — consistent with
-two modest, independent improvements compounding through multiplication.
+essentially exact, versus the GLM's 0.8430 (observed claims 15.7% below predicted) and
+Tweedie's 0.6813 (observed claims 31.9% below predicted). The combined effect is larger than
+either component challenger's individual edge (frequency: +3.0% deviance, Step 1; severity:
++0.38% deviance, Step 2) — consistent with two modest, independent improvements compounding
+through multiplication.
 
 ## But the aggregate numbers don't tell the whole story — checked, not assumed
 
